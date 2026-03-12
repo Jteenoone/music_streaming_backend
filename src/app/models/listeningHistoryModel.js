@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const listeningHisotrySchema = new mongoose.Schema({
+const listeningHistorySchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -22,4 +22,4 @@ const listeningHisotrySchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model("ListeningHistory", listeningHisotrySchema);
+module.exports = mongoose.model("ListeningHistory", listeningHistorySchema);

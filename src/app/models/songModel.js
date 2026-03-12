@@ -14,6 +14,10 @@ const songSchema = new mongoose.Schema(
       required: true,
     },
     album: { type: mongoose.Schema.Types.ObjectId, ref: "Album" },
+    coverImage: {
+      type: String,
+      default: "",
+    },
     audioUrl: {
       type: String,
       required: true,

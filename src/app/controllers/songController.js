@@ -1,4 +1,4 @@
-const Song = require("../models/songModel");
+const songService = require("../services/songService");
 
 const createSong = async (req, res) => {
   try {
@@ -11,19 +11,9 @@ const createSong = async (req, res) => {
         .json({ message: "Vui long nhap day du thong tin bai hat" });
     }
 
-    const newSong = new Song({
-      title,
-      artist,
-      album,
-      audioUrl,
-      coverImage,
-      duration,
-      genre,
-    });
+    const result = await songService.createSongService(req.body);
 
-    await newSong.save();
-
-    res.status(201).json({ message: "Them thanh cong", data: newSong });
+    res.status(201).json({ message: "Them thanh cong", data: result.data });
   } catch (error) {
     res.status(500).json({ message: "loi he thong" });
   }
@@ -33,12 +23,12 @@ const createSong = async (req, res) => {
 
 const getAllSongs = async (req, res) => {
   try {
-    const songs = await Song.find().populate('artist', 'name imageUrl');
+    const result = await songService.getAllSongsService();
 
     res.status(200).json({
       message: "lay thanh cong",
-      data: songs,
-      total: songs.length,
+      data: result.data,
+      total: result.data.length,
     });
   } catch (error) {
     res.status(500).json({ message: "Loi he thong" });
@@ -49,11 +39,12 @@ const getAllSongs = async (req, res) => {
 const getSongById = async (req, res) => {
   try {
     const songId = req.params.id;
-    const song = await Song.findById(songId).populate('artist', 'name imageUrl bio');
-    if (!song) {
-      return res.status(404).json({ message: "Khong tim thay" });
+
+    const result = await songService.getSongByIdService(songId);
+    if (!result.success) {
+      return res.status(result.status).json({ message: result.message });
     }
-    res.status(200).json({ message: "da tim thay bai hat", data: song });
+    res.status(200).json({ message: "da tim thay bai hat", data: result.data });
   } catch (error) {
     res.status(500).json({ message: "loi he thong" });
   }
@@ -64,13 +55,12 @@ const getSongById = async (req, res) => {
 const updateSong = async (req, res) => {
   try {
     const songId = req.params.id;
-    const updatedSong = await Song.findByIdAndUpdate(songId, req.body, {
-      new: true,
-    });
-    if (!updateSong) {
-      return res.status(404).json({ message: "Khong tim thay bai hat" });
+
+    const result = await songService.updateSongService(songId, req.body);
+    if (!result.success) {
+      return res.status(result.status).json({ message: result.message });
     }
-    res.status(200).json({ message: "Da cap nhat", data: updatedSong });
+    res.status(200).json({ message: "Da cap nhat", data: result.data });
   } catch (error) {
     res.status(500).json({ message: "loi he thong" });
   }
@@ -81,11 +71,10 @@ const updateSong = async (req, res) => {
 const deleteSong = async (req, res) => {
   try {
     const songId = req.params.id;
-    const deletedSong = await Song.findByIdAndDelete(songId);
-    if (!deletedSong) {
-      return res.status(404).json({ message: "Khong tim thay bai hat" });
+    const result = await songService.deleteSongService(songId);
+    if (!result.success) {
+      return res.status(result.status).json({ message: result.message });
     }
-
     res.status(200).json({ message: "Da xoa bai hat" });
   } catch (error) {
     res.status(500).json({ message: "loi he thong" });
