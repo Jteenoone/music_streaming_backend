@@ -11,10 +11,12 @@ router.get("/:id", albumController.getAlbumById);
 router.put("/:id", verifyAdmin, albumController.updateAlbum);
 router.delete("/:id", verifyAdmin, albumController.deleteAlbum);
 
-router.post("/:id/add-song", verifyAdmin, albumController.addSongToAlbum);
-router.put(
-  "/:id/remove-song",
+// songs in album
+router.post("/:id/songs", verifyAdmin, albumController.addSongToAlbum);
+router.delete(
+  "/:id/songs/:songId",
   verifyAdmin,
   albumController.removeSongFromAlbum,
 );
+
 module.exports = router;

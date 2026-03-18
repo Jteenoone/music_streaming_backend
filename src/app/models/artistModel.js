@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const removeAccents = require("../utils/removeAccent");
 
 const artistSchema = new mongoose.Schema(
   {
@@ -6,6 +7,9 @@ const artistSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+    },
+    nameNoAccent: {
+      type: String,
     },
     imageUrl: {
       type: String,
@@ -23,5 +27,11 @@ const artistSchema = new mongoose.Schema(
   },
   { timestamps: true },
 );
+
+artistSchema.pre("save", function () {
+  if (this.isModified("name") && this.name) {
+    this.nameNoAccent = removeAccents(this.name);
+  }
+});
 
 module.exports = mongoose.model("Artist", artistSchema);

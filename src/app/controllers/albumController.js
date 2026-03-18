@@ -117,7 +117,7 @@ const addSongToAlbum = async (req, res) => {
 const removeSongFromAlbum = async (req, res) => {
   try {
     const albumId = req.params.id;
-    const { songId } = req.body;
+    const { songId } = req.params.songId;
 
     if (!songId) {
       return res
