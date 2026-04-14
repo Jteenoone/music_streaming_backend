@@ -23,7 +23,7 @@ const registerService = async (username, email, password) => {
     email,
     password: hashedPassword,
     verifyEmailOTP: otp,
-    verifyEmailExpires: Date.now() + 5 * 69 * 1000,
+    verifyEmailExpires: Date.now() + 5 * 60 * 1000,
   });
 
   await newUser.save();
@@ -41,7 +41,6 @@ const registerService = async (username, email, password) => {
 
   return {
     success: true,
-    message: "Đăng ký thành công, vui lòng kiểm tra mã xác thực",
   };
 };
 

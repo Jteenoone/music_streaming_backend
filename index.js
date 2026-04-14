@@ -1,27 +1,36 @@
 require("dotenv").config();
 const express = require("express");
+const cors = require("cors");
+const morgan = require("morgan");
 const connectDB = require("./src/config/db");
 const rootRoute = require("./src/routes/index");
-const morgan = require("morgan");
 
 const app = express();
 
 connectDB();
 
-// BẮT BUỘC CÓ: Giúp Express đọc được dữ liệu JSON gửi lên
+// Middlewares
+app.use(cors());
+app.use(morgan("dev"));
 app.use(express.json());
 
-// Cắm toàn bộ hệ thống API vào đường dẫn '/api'
+// Routes
 app.use("/api", rootRoute);
 
-app.use(morgan("combined"));
-
 app.get("/", (req, res) => {
-  res.send("OK");
+  res.send("API is running...");
 });
 
-const PORT = 3000;
+// Middleware xử lý lỗi tập trung
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(err.status || 500).json({
+    message: err.message || "Lỗi hệ thống nội bộ",
+  });
+});
+
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("Done");
+  console.log(`Server is running on port ${PORT}`);
 });

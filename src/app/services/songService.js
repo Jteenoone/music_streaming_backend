@@ -81,7 +81,6 @@ const getTrendingSongService = async () => {
 };
 
 //tìm kiếm
-
 const searchService = async (keyword) => {
   const keywordNoAccent = removeAccents(keyword);
   const regex = new RegExp(keywordNoAccent, "i");

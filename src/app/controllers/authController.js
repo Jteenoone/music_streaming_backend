@@ -96,11 +96,9 @@ const verifyEmail = async (req, res) => {
   try {
     const { email, otp } = req.body;
     if (!email || !otp) {
-      return {
-        success: false,
-        status: 400,
-        message: "Vui lòng cung cấp đầy đủ email và otp",
-      };
+      return res.status(400).json({
+        message: "Vui lòng cung cấp đầy đủ email và otp",
+      });
     }
     const result = await authService.verifyEmailService(email, otp);
     if (!result.success) {
