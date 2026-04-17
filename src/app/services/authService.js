@@ -41,6 +41,11 @@ const registerService = async (username, email, password) => {
 
   return {
     success: true,
+    data: {
+      id: newUser._id,
+      username: newUser.username,
+      email: newUser.email,
+    },
   };
 };
 
@@ -58,8 +63,8 @@ const loginService = async (email, password) => {
   if (!isMatch) {
     return {
       success: false,
-      status: 404,
-      message: "Email hoặc mật khẩu không đúng",
+      status: 401,
+      message: "Email hoặc mật khẩu không đúng",
     };
   }
 

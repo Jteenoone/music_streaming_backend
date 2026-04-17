@@ -20,13 +20,13 @@ const getArtistByIdService = async (artistId) => {
 };
 
 const updateArtistService = async (artistId, data) => {
-  const updatedArtist = await Artist.findByIdAndUpdate(artistId, data, {
-    new: true,
-  });
-  if (!updatedArtist) {
-    return { success: false, status: 404, message: "Không tìm thấy Artist" };
+  const artist = await Artist.findById(artistId);
+  if (!artist) {
+    return { success: false, status: 404, message: "Không tìm thấy Artist" };
   }
-  return { success: true, data: updatedArtist };
+  Object.assign(artist, data);
+  await artist.save();
+  return { success: true, data: artist };
 };
 
 const deleteArtistService = async (artistId) => {

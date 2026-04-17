@@ -18,7 +18,30 @@ const storage = new CloudinaryStorage({
   },
 });
 
-// 3. Đưa kho chứa đồ cho anh "bốc vác" Multer quản lý
-const upload = multer({ storage: storage });
+// 3. Bộ lọc chỉ chấp nhận file audio và ảnh
+const fileFilter = (req, file, cb) => {
+  const allowedMimeTypes = [
+    "audio/mpeg",       // .mp3
+    "audio/wav",        // .wav
+    "audio/flac",       // .flac
+    "audio/ogg",        // .ogg
+    "image/jpeg",       // .jpg
+    "image/png",        // .png
+    "image/webp",       // .webp
+    "image/gif",        // .gif
+  ];
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error("Định dạng file không được hỗ trợ! Chỉ chấp nhận audio (mp3, wav, flac, ogg) và ảnh (jpg, png, webp, gif)."), false);
+  }
+};
+
+// 4. Đưa kho chứa đồ cho anh "bốc vác" Multer quản lý (giới hạn 20MB)
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+  fileFilter: fileFilter,
+});
 
 module.exports = upload;

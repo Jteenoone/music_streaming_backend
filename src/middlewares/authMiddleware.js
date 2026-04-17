@@ -35,7 +35,20 @@ const verifyToken = (req, res, next) => {
  * Phải dùng sau verifyToken
  */
 const verifyAdmin = (req, res, next) => {
-  if (req.user && req.user.role === "admin") {
+  // Chain verifyToken first if not already verified
+  if (!req.user) {
+    return verifyToken(req, res, () => {
+      if (req.user && req.user.role === "admin") {
+        next();
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: "Từ chối truy cập. Bạn không có quyền Admin!",
+        });
+      }
+    });
+  }
+  if (req.user.role === "admin") {
     next();
   } else {
     return res.status(403).json({

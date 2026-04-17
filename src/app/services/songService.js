@@ -43,11 +43,13 @@ const getSongByIdService = async (songId) => {
 };
 
 const updateSongService = async (songId, data) => {
-  const updatedSong = await Song.findByIdAndUpdate(songId, data, { new: true });
-  if (!updatedSong) {
-    return { success: false, status: 404, message: "Không tìm thấy bài hát" };
+  const song = await Song.findById(songId);
+  if (!song) {
+    return { success: false, status: 404, message: "Không tìm thấy bài hát" };
   }
-  return { success: true, data: updatedSong };
+  Object.assign(song, data);
+  await song.save();
+  return { success: true, data: song };
 };
 
 const deleteSongService = async (songId) => {

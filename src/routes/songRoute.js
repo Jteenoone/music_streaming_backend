@@ -6,6 +6,7 @@ const upload = require("../app/utils/cloudinaryConfig");
 
 router.post(
   "/",
+  verifyToken,
   verifyAdmin,
   upload.fields([
     { name: "audioFile", maxCount: 1 },
@@ -18,7 +19,7 @@ router.get("/trending", songController.getTrendingSong);
 router.get("/search", songController.search);
 router.get("/", songController.getAllSongs);
 router.get("/:id", songController.getSongById);
-router.put("/:id", verifyAdmin, songController.updateSong);
-router.delete("/:id", verifyAdmin, songController.deleteSong);
+router.put("/:id", verifyToken, verifyAdmin, songController.updateSong);
+router.delete("/:id", verifyToken, verifyAdmin, songController.deleteSong);
 
 module.exports = router;
