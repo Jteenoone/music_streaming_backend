@@ -13,10 +13,14 @@ const getAllAlbumsService = async () => {
 
 const getAlbumByIdService = async (albumId) => {
   const album = await Album.findById(albumId)
-    .populate("artist", "name bio")
-    .populate("songs", "title audioUrl duration");
+    .populate("artist", "name bio imageUrl")
+    .populate({
+      path: "songs",
+      select: "title audioUrl duration coverImage playCount genre",
+      populate: { path: "artist", select: "name" },
+    });
   if (!album) {
-    return { success: false, status: 404, message: "Không tìm thấy Album!" };
+    return { success: false, status: 404, message: "Không tìm thấy Album!" };
   }
   return { success: true, data: album };
 };
@@ -25,11 +29,9 @@ const updateAlbumService = async (albumId, data) => {
   if (data.songs) {
     delete data.songs;
   }
-  const updateAlbum = await Album.findByIdAndUpdate(albumId, data, {
-    new: true,
-  });
+  const updateAlbum = await Album.findByIdAndUpdate(albumId, data, { new: true });
   if (!updateAlbum) {
-    return { success: false, status: 404, message: "Không tìm thấy Album" };
+    return { success: false, status: 404, message: "Không tìm thấy Album" };
   }
   return { success: true, data: updateAlbum };
 };
@@ -37,7 +39,7 @@ const updateAlbumService = async (albumId, data) => {
 const deleteAlbumService = async (albumId) => {
   const result = await Album.findByIdAndDelete(albumId);
   if (!result) {
-    return { success: false, status: 404, message: "Không có Album để xoá" };
+    return { success: false, status: 404, message: "Không có Album để xoá" };
   }
   return { success: true };
 };
@@ -49,7 +51,7 @@ const addSongToAlbumService = async (albumId, songId) => {
     { new: true },
   ).populate("songs", "title");
   if (!updatedAlbum) {
-    return { success: false, status: 404, message: "Không tìm thấy ALbum" };
+    return { success: false, status: 404, message: "Không tìm thấy Album" };
   }
   return { success: true, data: updatedAlbum };
 };
@@ -61,7 +63,7 @@ const removeSongFromAlbumService = async (albumId, songId) => {
     { new: true },
   );
   if (!updatedAlbum) {
-    return { success: false, status: 404, message: "Không tìm thấy Album" };
+    return { success: false, status: 404, message: "Không tìm thấy Album" };
   }
   return { success: true, data: updatedAlbum };
 };
