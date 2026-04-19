@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FaMusic, FaEye, FaEyeSlash } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { authAPI } from "../services/api";
+import logo from '../assets/images/apple-music.jpg';
 
 export default function ForgotPassword() {
     const [step, setStep] = useState(1); // 1: nhập email, 2: nhập OTP + mật khẩu mới
@@ -56,7 +57,7 @@ export default function ForgotPassword() {
             <div className="bg-[#1a1f35] border border-[#2e3450] rounded-2xl px-12 py-10 w-full max-w-[420px] shadow-[0_24px_60px_rgba(0,0,0,0.5)]">
                 {/* Logo */}
                 <div className="flex items-center gap-2.5 mb-7">
-                    <FaMusic size={28} color="#7c83f5"/>
+                     <img src={logo} alt="Logo" className="w-[40px] rounded-md" />
                     <span className="text-xl font-bold text-white tracking-[0.5px]">Sound Wave</span>
                 </div>
 

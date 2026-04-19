@@ -2,8 +2,8 @@ const albumService = require("../services/albumService");
 
 const createAlbum = async (req, res) => {
   try {
-    // Đã bổ sung lại 'songs' để nhận mảng bài hát từ Frontend
-    const { title, artist, coverImage, releaseYear, songs } = req.body;
+    const { title, artist, releaseYear, songs } = req.body;
+    let { coverImage } = req.body;
 
     if (!title || !artist) {
       return res
@@ -11,7 +11,8 @@ const createAlbum = async (req, res) => {
         .json({ message: "Vui lòng nhập tên album và ID ca sĩ" });
     }
 
-    // Truyền luôn 'songs' sang cho Bếp trưởng (Service) xử lý
+    if (req.files?.coverImage) coverImage = req.files.coverImage[0].path;
+
     const result = await albumService.createAlbumService({
       title,
       artist,
@@ -59,13 +60,13 @@ const getAlbumById = async (req, res) => {
   }
 };
 
-// Cập nhật thông tin cơ bản của Album (Chỉ sửa tên, năm phát hành, ảnh bìa...)
 const updateAlbum = async (req, res) => {
   try {
     const albumId = req.params.id;
-    // Lấy req.body ra, nếu Frontend có lỡ gửi kèm mảng 'songs' thì vứt nó đi, không cho phép update qua đường này.
+    const data = { ...req.body };
+    if (req.files?.coverImage) data.coverImage = req.files.coverImage[0].path;
 
-    const result = await albumService.updateAlbumService(albumId, req.body);
+    const result = await albumService.updateAlbumService(albumId, data);
     if (!result.success) {
       return res.status(result.status).json({ message: result.message });
     }

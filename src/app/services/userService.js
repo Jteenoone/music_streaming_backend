@@ -84,10 +84,71 @@ const changePasswordService = async (userId, oldPassword, newPassword) => {
   return { success: true };
 };
 
+const getLibraryService = async (userId) => {
+  const user = await User.findById(userId)
+    .populate("followedArtists", "name imageUrl")
+    .populate("savedAlbums", "title coverImage artist")
+    .select("followedArtists savedAlbums");
+  if (!user) return { success: false, status: 404, message: "Không tìm thấy user" };
+  return { success: true, data: { artists: user.followedArtists, albums: user.savedAlbums } };
+};
+
+const toggleFollowArtistService = async (userId, artistId) => {
+  const user = await User.findById(userId);
+  if (!user) return { success: false, status: 404, message: "Không tìm thấy user" };
+  const idx = user.followedArtists.findIndex(id => id.toString() === artistId);
+  if (idx === -1) {
+    user.followedArtists.push(artistId);
+  } else {
+    user.followedArtists.splice(idx, 1);
+  }
+  await user.save();
+  return { success: true, following: idx === -1, message: idx === -1 ? "Đã theo dõi" : "Đã bỏ theo dõi" };
+};
+
+const toggleSaveAlbumService = async (userId, albumId) => {
+  const user = await User.findById(userId);
+  if (!user) return { success: false, status: 404, message: "Không tìm thấy user" };
+  const idx = user.savedAlbums.findIndex(id => id.toString() === albumId);
+  if (idx === -1) {
+    user.savedAlbums.push(albumId);
+  } else {
+    user.savedAlbums.splice(idx, 1);
+  }
+  await user.save();
+  return { success: true, saved: idx === -1, message: idx === -1 ? "Đã lưu album" : "Đã bỏ lưu" };
+};
+
+const recordPlayService = async (userId, songId) => {
+  const user = await User.findById(userId);
+  if (!user) return { success: false };
+  user.recentlyPlayed = user.recentlyPlayed.filter(p => p.song.toString() !== songId.toString());
+  user.recentlyPlayed.unshift({ song: songId, playedAt: new Date() });
+  if (user.recentlyPlayed.length > 20) user.recentlyPlayed = user.recentlyPlayed.slice(0, 20);
+  await user.save();
+  return { success: true };
+};
+
+const getRecentlyPlayedService = async (userId) => {
+  const user = await User.findById(userId)
+    .populate({
+      path: "recentlyPlayed.song",
+      populate: { path: "artist", select: "name imageUrl" },
+    })
+    .select("recentlyPlayed");
+  if (!user) return { success: false, status: 404, message: "Không tìm thấy user" };
+  return { success: true, data: user.recentlyPlayed.filter(p => p.song) };
+};
+
 module.exports = {
   getMyProfileService,
   updateMyProfileService,
   getAllUsersService,
   deleteUserService,
   changePasswordService,
+  getLibraryService,
+  toggleFollowArtistService,
+  toggleSaveAlbumService,
+  recordPlayService,
+  getRecentlyPlayedService,
 };

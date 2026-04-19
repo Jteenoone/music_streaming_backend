@@ -1,4 +1,5 @@
 const Artist = require("../models/artistModel");
+const Song = require("../models/songModel");
 
 const createArtistService = async (data) => {
   const newArtist = new Artist(data);
@@ -37,10 +38,20 @@ const deleteArtistService = async (artistId) => {
   return { success: true };
 };
 
+const getArtistSongsService = async (artistId) => {
+  const artist = await Artist.findById(artistId);
+  if (!artist) return { success: false, status: 404, message: "Không tìm thấy Artist" };
+  const songs = await Song.find({ artist: artistId })
+    .populate("artist", "name imageUrl")
+    .sort({ playCount: -1 });
+  return { success: true, data: { artist, songs } };
+};
+
 module.exports = {
   createArtistService,
   getAllArtistsService,
   getArtistByIdService,
+  getArtistSongsService,
   updateArtistService,
   deleteArtistService,
 };

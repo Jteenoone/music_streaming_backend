@@ -1,12 +1,14 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { MdDashboard, MdMusicNote, MdAlbum, MdPeople } from "react-icons/md";
+import { MdDashboard, MdMusicNote, MdAlbum, MdPeople, MdPerson } from "react-icons/md";
 import { FaMusic, FaSignOutAlt } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
+import logo from "../../assets/images/apple-music.jpg"
 
 const navItems = [
   { to: "/admin",          label: "Dashboard",    icon: <MdDashboard size={18}/>,  end: true },
   { to: "/admin/songs",    label: "Bài hát",      icon: <MdMusicNote size={18}/> },
   { to: "/admin/albums",   label: "Album",        icon: <MdAlbum size={18}/> },
+  { to: "/admin/artists",  label: "Nghệ sĩ",      icon: <MdPerson size={18}/> },
   { to: "/admin/users",    label: "Người dùng",   icon: <MdPeople size={18}/> },
 ];
 
@@ -25,7 +27,7 @@ export default function AdminLayout() {
       <aside className="w-[220px] shrink-0 bg-[#1a1f35] border-r border-[#2e3450] flex flex-col">
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-5 py-5 border-b border-[#2e3450]">
-          <FaMusic size={20} color="#7c83f5"/>
+        <img src={logo} alt="Logo" className="w-[40px] rounded-md"/>
           <div>
             <p className="text-sm font-bold text-white m-0">Sound Wave</p>
             <p className="text-[10px] text-[#7c83f5] m-0 uppercase tracking-wider">Admin Panel</p>

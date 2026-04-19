@@ -69,7 +69,19 @@ const getSongById = async (req, res) => {
 const updateSong = async (req, res) => {
   try {
     const songId = req.params.id;
-    const result = await songService.updateSongService(songId, req.body);
+    const data = { ...req.body };
+
+    if (req.files?.audioFile) data.audioUrl = req.files.audioFile[0].path;
+    if (req.files?.coverImage) data.coverImage = req.files.coverImage[0].path;
+
+    if (data.artistName && !data.artist) {
+      let artist = await Artist.findOne({ name: data.artistName });
+      if (!artist) artist = await Artist.create({ name: data.artistName });
+      data.artist = artist._id;
+      delete data.artistName;
+    }
+
+    const result = await songService.updateSongService(songId, data);
     if (!result.success) {
       return res.status(result.status).json({ message: result.message });
     }
@@ -129,7 +141,20 @@ const search = async (req, res) => {
       message: `Kết quả tìm kiếm cho ${keyword}`,
       data: result.data.songs,
       artists: result.data.artists,
+      albums: result.data.albums,
     });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi hệ thống", error: error.message });
+  }
+};
+
+const getRecommended = async (req, res) => {
+  try {
+    // excludeIds: danh sách id bài đã nghe trong session, truyền qua query ?exclude=id1,id2
+    const excludeIds = req.query.exclude ? req.query.exclude.split(',') : [];
+    const result = await songService.getRecommendedService(req.params.id, excludeIds);
+    if (!result.success) return res.status(result.status).json({ message: result.message });
+    res.status(200).json({ message: "Gợi ý bài hát", data: result.data });
   } catch (error) {
     res.status(500).json({ message: "Lỗi hệ thống", error: error.message });
   }
@@ -144,4 +169,5 @@ module.exports = {
   getTrendingSong,
   incrementPlayCount,
   search,
+  getRecommended,
 };

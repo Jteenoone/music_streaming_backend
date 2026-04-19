@@ -18,8 +18,18 @@ router.put("/:id/play", verifyToken, songController.incrementPlayCount);
 router.get("/trending", songController.getTrendingSong);
 router.get("/search", songController.search);
 router.get("/", songController.getAllSongs);
+router.get("/:id/recommend", songController.getRecommended);
 router.get("/:id", songController.getSongById);
-router.put("/:id", verifyToken, verifyAdmin, songController.updateSong);
+router.put(
+  "/:id",
+  verifyToken,
+  verifyAdmin,
+  upload.fields([
+    { name: "audioFile", maxCount: 1 },
+    { name: "coverImage", maxCount: 1 },
+  ]),
+  songController.updateSong,
+);
 router.delete("/:id", verifyToken, verifyAdmin, songController.deleteSong);
 
 module.exports = router;

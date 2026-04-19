@@ -50,20 +50,22 @@ function SongModal({ song, onSave, onClose }) {
             <label className="text-xs text-[#9ca3af] mb-1 block">Tên nghệ sĩ *</label>
             <input name="artistName" value={form.artistName} onChange={handleChange} placeholder="Nhập tên nghệ sĩ" className={inputCls}/>
           </div>
-          {!song && (
-            <>
-              <div>
-                <label className="text-xs text-[#9ca3af] mb-1 block">File nhạc MP3 *</label>
-                <input type="file" accept="audio/*" onChange={e => setAudioFile(e.target.files[0])}
-                  className="w-full text-sm text-[#9ca3af] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-[#2e3450] file:text-white file:cursor-pointer"/>
-              </div>
-              <div>
-                <label className="text-xs text-[#9ca3af] mb-1 block">Ảnh bìa</label>
-                <input type="file" accept="image/*" onChange={e => setCoverImage(e.target.files[0])}
-                  className="w-full text-sm text-[#9ca3af] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-[#2e3450] file:text-white file:cursor-pointer"/>
-              </div>
-            </>
-          )}
+          <div>
+            <label className="text-xs text-[#9ca3af] mb-1 block">
+              File nhạc MP3 {!song && <span className="text-[#f87171]">*</span>}
+              {song && <span className="text-[#6b7280]"> (để trống nếu không thay đổi)</span>}
+            </label>
+            <input type="file" accept="audio/*" onChange={e => setAudioFile(e.target.files[0])}
+              className="w-full text-sm text-[#9ca3af] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-[#2e3450] file:text-white file:cursor-pointer"/>
+          </div>
+          <div>
+            <label className="text-xs text-[#9ca3af] mb-1 block">
+              Ảnh bìa
+              {song && <span className="text-[#6b7280]"> (để trống nếu không thay đổi)</span>}
+            </label>
+            <input type="file" accept="image/*" onChange={e => setCoverImage(e.target.files[0])}
+              className="w-full text-sm text-[#9ca3af] file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-[#2e3450] file:text-white file:cursor-pointer"/>
+          </div>
           {error && <p className="text-xs text-[#f87171] m-0">{error}</p>}
           <div className="flex gap-3 justify-end pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-[#2e3450] text-sm text-[#9ca3af] bg-transparent cursor-pointer hover:bg-white/5 transition-colors">Hủy</button>
@@ -109,7 +111,12 @@ export default function SongManager() {
       if (coverImage) fd.append("coverImage", coverImage);
       await songAPI.create(fd);
     } else {
-      await songAPI.update(modal.id, { title: form.title });
+      const fd = new FormData();
+      fd.append("title", form.title);
+      fd.append("artistName", form.artistName);
+      if (audioFile) fd.append("audioFile", audioFile);
+      if (coverImage) fd.append("coverImage", coverImage);
+      await songAPI.update(modal.id, fd);
     }
     setModal(null);
     fetchSongs();

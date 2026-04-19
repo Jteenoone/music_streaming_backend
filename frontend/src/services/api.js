@@ -61,6 +61,17 @@ export const songAPI = {
   update:    (id, data)              => api.put(`/songs/${id}`,    data),
   delete:    (id)                    => api.delete(`/songs/${id}`),
   play:      (id)                    => api.put(`/songs/${id}/play`),
+  recommend: (id, excludeIds = [])   => api.get(`/songs/${id}/recommend`, { params: { exclude: excludeIds.join(',') } }),
+};
+
+// ── Artists ───────────────────────────────────────────────────────────────────
+export const artistAPI = {
+  getAll:  ()          => api.get('/artists'),
+  getById: (id)        => api.get(`/artists/${id}`),
+  getSongs:(id)        => api.get(`/artists/${id}/songs`),
+  create:  (data)      => api.post('/artists',      data),
+  update:  (id, data)  => api.put(`/artists/${id}`, data),
+  delete:  (id)        => api.delete(`/artists/${id}`),
 };
 
 // ── Albums ────────────────────────────────────────────────────────────────────
@@ -79,8 +90,13 @@ export const userAPI = {
   getMe:           ()              => api.get('/user/me'),
   updateMe:        (data)          => api.put('/user/me',              data),
   changePassword:  (oldPassword, newPassword) => api.put('/user/change-password', { oldPassword, newPassword }),
+  getLibrary:      ()              => api.get('/user/library'),
+  followArtist:    (artistId)      => api.post(`/user/follow-artist/${artistId}`),
+  saveAlbum:       (albumId)       => api.post(`/user/save-album/${albumId}`),
   getAll:          ()              => api.get('/user'),
   delete:          (id)            => api.delete(`/user/${id}`),
+  recordPlay:      (songId)        => api.post(`/user/recently-played/${songId}`),
+  getRecentlyPlayed: ()            => api.get('/user/recently-played'),
 };
 
 export default api;

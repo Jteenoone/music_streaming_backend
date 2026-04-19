@@ -31,7 +31,7 @@ export default function FeaturedSongs() {
             <p className="text-[#6b7280] text-sm py-4">Chưa có bài hát nào.</p>
           )}
           {songs.slice(0, 4).map(item => (
-            <SongCard key={item.id} item={item}/>
+            <SongCard key={item.id} item={item} queue={songs}/>
           ))}
         </div>
         <img src={src_img} alt="" className="w-[400px] h-full object-cover rounded-lg"/>

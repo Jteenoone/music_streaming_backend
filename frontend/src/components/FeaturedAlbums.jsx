@@ -2,11 +2,21 @@ import { useEffect, useState } from 'react';
 import AlbumCard from "./AlbumCard";
 import { albumAPI, normalizeAlbum } from '../services/api';
 import { useNavigate } from "react-router-dom";
+import { usePlayer } from '../context/PlayerContext';
 
 export default function FeaturedAlbums() {
     const [albums, setAlbums] = useState([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const { playSong } = usePlayer();
+
+    const handlePlay = async (albumId) => {
+        try {
+            const res = await albumAPI.getById(albumId);
+            const album = normalizeAlbum(res.data.data);
+            if (album.songs.length > 0) playSong(album.songs[0], album.songs, albumId);
+        } catch {}
+    };
 
     useEffect(() => {
         setLoading(true);
@@ -29,9 +39,11 @@ export default function FeaturedAlbums() {
                 {albums.map((album) => (
                     <AlbumCard
                         key={album.id}
+                        albumId={album.id}
                         src_img={album.image}
                         name_album={album.name}
                         name_singer={album.singer}
+                        onPlay={() => handlePlay(album.id)}
                         onClick={() => navigate(`/album/${album.id}`)}
                     />
                 ))}

@@ -36,6 +36,12 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    followedArtists: [{ type: mongoose.Schema.Types.ObjectId, ref: "Artist" }],
+    savedAlbums:     [{ type: mongoose.Schema.Types.ObjectId, ref: "Album"  }],
+    recentlyPlayed:  [{
+      song:     { type: mongoose.Schema.Types.ObjectId, ref: "Song" },
+      playedAt: { type: Date, default: Date.now },
+    }],
     verifyEmailOTP: {
       type: String,
       default: null,

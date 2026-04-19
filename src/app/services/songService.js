@@ -1,6 +1,7 @@
 const Song = require("../models/songModel");
 const removeAccents = require("../utils/removeAccent");
 const Artist = require("../models/artistModel");
+const Album = require("../models/albumModel");
 
 const createSongService = async (data) => {
   const newSong = new Song(data);
@@ -86,17 +87,39 @@ const getTrendingSongService = async () => {
 const searchService = async (keyword) => {
   const keywordNoAccent = removeAccents(keyword);
   const regex = new RegExp(keywordNoAccent, "i");
+  const rawRegex = new RegExp(keyword, "i");
 
-  const songs = await Song.find({ titleNoAccent: regex })
-    .populate("artist", "name imageUrl")
-    .limit(15);
-
-  const artists = await Artist.find({ nameNoAccent: regex }).limit(5);
+  const [songs, artists, albums] = await Promise.all([
+    Song.find({ titleNoAccent: regex }).populate("artist", "name imageUrl").limit(8),
+    Artist.find({ nameNoAccent: regex }).limit(4),
+    Album.find({ title: { $regex: rawRegex } }).populate("artist", "name").limit(4),
+  ]);
 
   return {
     success: true,
-    data: { songs, artists },
+    data: { songs, artists, albums },
   };
+};
+
+const getRecommendedService = async (songId, excludeIds = []) => {
+  const song = await Song.findById(songId);
+  if (!song) return { success: false, status: 404, message: "Không tìm thấy bài hát" };
+
+  // Loại trừ bài hiện tại + toàn bộ bài đã nghe trong session
+  const excluded = [...new Set([songId.toString(), ...excludeIds.map(String)])];
+
+  const recommended = await Song.find({
+    _id: { $nin: excluded },
+    $or: [
+      { artist: song.artist },
+      { genre: { $in: song.genre } },
+    ],
+  })
+    .populate("artist", "name imageUrl")
+    .sort({ playCount: -1 })
+    .limit(10);
+
+  return { success: true, data: recommended };
 };
 
 module.exports = {
@@ -108,4 +131,5 @@ module.exports = {
   incrementPlayCountService,
   getTrendingSongService,
   searchService,
+  getRecommendedService,
 };

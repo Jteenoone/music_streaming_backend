@@ -84,10 +84,64 @@ const changePassword = async (req, res) => {
     res.status(500).json({ message: "Lỗi hệ thống" });
   }
 };
+const getLibrary = async (req, res) => {
+  try {
+    const result = await userService.getLibraryService(req.user.id);
+    if (!result.success) return res.status(result.status).json({ message: result.message });
+    res.status(200).json({ message: "Thư viện", data: result.data });
+  } catch {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
+const toggleFollowArtist = async (req, res) => {
+  try {
+    const result = await userService.toggleFollowArtistService(req.user.id, req.params.artistId);
+    if (!result.success) return res.status(result.status).json({ message: result.message });
+    res.status(200).json({ message: result.message, following: result.following });
+  } catch {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
+const toggleSaveAlbum = async (req, res) => {
+  try {
+    const result = await userService.toggleSaveAlbumService(req.user.id, req.params.albumId);
+    if (!result.success) return res.status(result.status).json({ message: result.message });
+    res.status(200).json({ message: result.message, saved: result.saved });
+  } catch {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
+const recordPlay = async (req, res) => {
+  try {
+    await userService.recordPlayService(req.user.id, req.params.songId);
+    res.status(200).json({ message: "ok" });
+  } catch {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
+const getRecentlyPlayed = async (req, res) => {
+  try {
+    const result = await userService.getRecentlyPlayedService(req.user.id);
+    if (!result.success) return res.status(result.status).json({ message: result.message });
+    res.status(200).json({ message: "ok", data: result.data });
+  } catch {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
 module.exports = {
   getMyProfile,
   updateMyProfile,
   getAllUsers,
   deleteUser,
   changePassword,
+  getLibrary,
+  toggleFollowArtist,
+  toggleSaveAlbum,
+  recordPlay,
+  getRecentlyPlayed,
 };

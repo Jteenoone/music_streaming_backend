@@ -7,6 +7,8 @@ import Layout from "./pages/Layout";
 import NotFound from './pages/NotFound';
 import HomePage from "./components/HomePage";
 import AlbumDetail from "./components/AlbumDetail";
+import ArtistPage from "./pages/ArtistPage";
+import ProfilePage from "./pages/ProfilePage";
 import Login from "./components/Login";
 import Register from "./components/Register";
 import ForgotPassword from "./components/ForgotPassword";
@@ -16,6 +18,7 @@ import AdminLayout from "./pages/admin/AdminLayout";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import SongManager from "./pages/admin/SongManager";
 import AlbumManager from "./pages/admin/AlbumManager";
+import ArtistManager from "./pages/admin/ArtistManager";
 import UserManager from "./pages/admin/UserManager";
 
 // Redirect admin away from user layout
@@ -31,6 +34,8 @@ function AppRoutes() {
       <Route path="/" element={<UserRoute><Layout/></UserRoute>}>
         <Route index element={<HomePage/>}/>
         <Route path="album/:id" element={<AlbumDetail/>}/>
+        <Route path="artist/:id" element={<ArtistPage/>}/>
+        <Route path="profile" element={<ProfilePage/>}/>
       </Route>
       <Route path="/login" element={<Login/>}/>
       <Route path="/register" element={<Register/>}/>
@@ -41,6 +46,7 @@ function AppRoutes() {
         <Route index element={<AdminDashboard/>}/>
         <Route path="songs" element={<SongManager/>}/>
         <Route path="albums" element={<AlbumManager/>}/>
+        <Route path="artists" element={<ArtistManager/>}/>
         <Route path="users" element={<UserManager/>}/>
       </Route>
 

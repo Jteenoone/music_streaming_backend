@@ -1,14 +1,18 @@
 import { createContext, useContext, useRef, useState } from "react";
-import { songAPI } from '../services/api';
+import { songAPI, userAPI, normalizeSong } from '../services/api';
+import { useAuth } from './AuthContext';
 
 const PlayerContext = createContext();
 
 export function PlayerProvider({children}) {
+    const { user } = useAuth();
     const [queue, setQueue] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [isShuffle, setIsShuffle] = useState(false);
-    const [repeatMode, setRepeatMode] = useState('none'); // 'none' | 'all' | 'one'
+    const [repeatMode, setRepeatMode] = useState('none');
+    const [isQueuedContext, setIsQueuedContext] = useState(false);
+    const [queueSourceId, setQueueSourceId] = useState(null); // albumId hoặc artistId đang phát
     const audioRef = useRef(new Audio());
 
     const currentSong = currentIndex !== null ? queue[currentIndex] : null;
@@ -22,18 +26,17 @@ export function PlayerProvider({children}) {
         audioRef.current.addEventListener('canplay', () => {
             audioRef.current.play();
         }, { once: true });
-        // Tăng lượt nghe sau khi bắt đầu phát
         if (song.id) {
             songAPI.play(song.id).catch(() => {});
+            if (user) userAPI.recordPlay(song.id).catch(() => {});
         }
     };
 
-    // playSong: play a specific song, optionally replacing the queue
-    const playSong = (song, newQueue) => {
+    const playSong = (song, newQueue, sourceId = null) => {
         const targetQueue = newQueue || queue;
         const idx = targetQueue.findIndex(s => s.id === song.id);
 
-        // Toggle play/pause if same song and no queue change
+        // Toggle play/pause nếu cùng bài, không đổi queue
         if (!newQueue && idx !== -1 && currentIndex === idx) {
             if (audioRef.current.paused) {
                 audioRef.current.play();
@@ -45,8 +48,10 @@ export function PlayerProvider({children}) {
             return;
         }
 
+        setIsQueuedContext(newQueue ? newQueue.length > 1 : false);
+        if (newQueue) setQueueSourceId(sourceId);
+
         const finalIdx = idx === -1 ? 0 : idx;
-        // Nếu không có queue mới và bài không có trong queue hiện tại → tạo queue 1 bài
         const queueToSet = newQueue ?? (idx === -1 ? [song] : undefined);
         loadAndPlay(song, queueToSet, finalIdx);
     };
@@ -74,12 +79,52 @@ export function PlayerProvider({children}) {
         prev === 'none' ? 'all' : prev === 'all' ? 'one' : 'none'
     );
 
+    // Dùng ref để luôn đọc được giá trị mới nhất trong onended closure
+    const queueRef = useRef(queue);
+    const currentIndexRef = useRef(currentIndex);
+    const repeatModeRef = useRef(repeatMode);
+    const isQueuedContextRef = useRef(isQueuedContext);
+    queueRef.current = queue;
+    currentIndexRef.current = currentIndex;
+    repeatModeRef.current = repeatMode;
+    isQueuedContextRef.current = isQueuedContext;
+
     audioRef.current.onended = () => {
-        if (repeatMode === 'one') {
+        const q = queueRef.current;
+        const idx = currentIndexRef.current;
+        const repeat = repeatModeRef.current;
+        const hasContext = isQueuedContextRef.current;
+
+        if (repeat === 'one') {
             audioRef.current.currentTime = 0;
             audioRef.current.play();
-        } else if (repeatMode === 'all' || currentIndex < queue.length - 1) {
-            playNext();
+            return;
+        }
+
+        if (repeat === 'all' || idx < q.length - 1) {
+            // Còn bài trong queue → phát tiếp bình thường
+            const nextIdx = (idx + 1) % q.length;
+            loadAndPlay(q[nextIdx], undefined, nextIdx);
+            return;
+        }
+
+        // Hết queue — nếu đang nghe lẻ (không có context album/artist) → fetch recommend
+        if (!hasContext && q[idx]?.id) {
+            // Truyền toàn bộ id đã có trong queue để không recommend lại bài cũ
+            const playedIds = q.map(s => s.id).filter(Boolean);
+            songAPI.recommend(q[idx].id, playedIds)
+                .then(res => {
+                    const recommended = (res.data.data ?? []).map(normalizeSong).filter(Boolean);
+                    if (recommended.length > 0) {
+                        // Thêm recommended vào queue và phát bài đầu tiên
+                        const newQueue = [...q, ...recommended];
+                        setQueue(newQueue);
+                        loadAndPlay(recommended[0], undefined, idx + 1);
+                    } else {
+                        setIsPlaying(false);
+                    }
+                })
+                .catch(() => setIsPlaying(false));
         } else {
             setIsPlaying(false);
         }
@@ -90,7 +135,7 @@ export function PlayerProvider({children}) {
             currentSong, isPlaying, playSong, audioRef,
             playNext, playPrev,
             isShuffle, repeatMode, toggleShuffle, toggleRepeat,
-            queue, setQueue
+            queue, setQueue, queueSourceId
         }}>
             {children}
         </PlayerContext.Provider>

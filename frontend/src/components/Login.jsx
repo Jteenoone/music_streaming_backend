@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FaEye, FaEyeSlash, FaMusic } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import logo from '../assets/images/apple-music.jpg';
 
 export default function Login() {
     const [form, setForm] = useState({ email: "", password: "" });
@@ -40,7 +41,7 @@ export default function Login() {
             <div className="bg-[#1a1f35] border border-[#2e3450] rounded-2xl px-12 py-10 w-full max-w-[420px] shadow-[0_24px_60px_rgba(0,0,0,0.5)]">
                 {/* Logo */}
                 <div className="flex items-center gap-2.5 mb-7">
-                    <FaMusic size={28} color="#7c83f5" />
+                    <img src={logo} alt="Logo" className="w-[40px] rounded-md" />
                     <span className="text-xl font-bold text-white tracking-[0.5px]">Sound Wave</span>
                 </div>
 

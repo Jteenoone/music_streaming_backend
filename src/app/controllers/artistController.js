@@ -83,10 +83,21 @@ const deleteArtist = async (req, res) => {
   }
 };
 
+const getArtistSongs = async (req, res) => {
+  try {
+    const result = await artistService.getArtistSongsService(req.params.id);
+    if (!result.success) return res.status(result.status).json({ message: result.message });
+    res.status(200).json({ message: "Bài hát của ca sĩ", data: result.data });
+  } catch (error) {
+    res.status(500).json({ message: "Lỗi hệ thống" });
+  }
+};
+
 module.exports = {
   createArtist,
   getAllArtists,
   getArtistById,
+  getArtistSongs,
   updateArtist,
   deleteArtist,
 };

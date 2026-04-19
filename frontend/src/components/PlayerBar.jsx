@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { usePlayer } from '../context/PlayerContext';
 import { MdSkipPrevious, MdSkipNext } from "react-icons/md";
 import { FaVolumeUp, FaVolumeMute, FaVolumeDown, FaPlay, FaPause, FaRandom } from "react-icons/fa";
@@ -6,6 +7,7 @@ import { TbRepeat, TbRepeatOnce } from "react-icons/tb";
 
 export default function PlayerBar() {
   const { currentSong, isPlaying, playSong, audioRef, playNext, playPrev, isShuffle, repeatMode, toggleShuffle, toggleRepeat } = usePlayer();
+  const navigate = useNavigate();
 
   const [isMuted, setIsMuted] = useState(false);
   const [volume, setVolume] = useState(0.5);
@@ -77,7 +79,10 @@ export default function PlayerBar() {
           <p className="m-0 text-sm font-semibold whitespace-nowrap overflow-hidden text-ellipsis">
             {currentSong.name || 'Loading...'}
           </p>
-          <small className="text-xs text-[#9ca3af]">{currentSong.singer || 'Loading...'}</small>
+          <small
+            className={`text-xs text-[#9ca3af] ${currentSong.artistId ? 'cursor-pointer hover:underline' : ''}`}
+            onClick={() => currentSong.artistId && navigate(`/artist/${currentSong.artistId}`)}
+          >{currentSong.singer || 'Loading...'}</small>
         </div>
       </div>
 
