@@ -23,8 +23,11 @@ export function normalizeSong(s) {
     duration: s.duration,
     playCount: s.playCount ?? 0,
     genre:    s.genre ?? [],
-    artistId: s.artist?._id ?? s.artist,
-    albumId:  s.album?._id ?? s.album,
+    artistId:  s.artist?._id ?? s.artist,
+    albumId:   s.album?._id ?? s.album,
+    copyright: s.copyright && typeof s.copyright === 'object'
+      ? s.copyright
+      : { owner: '', license: 'All rights reserved', year: null, status: 'active', expiresAt: null },
   };
 }
 

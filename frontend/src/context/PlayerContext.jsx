@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState } from "react";
+import { createContext, useContext, useRef, useState, useEffect } from "react";
 import { songAPI, userAPI, normalizeSong } from '../services/api';
 import { useAuth } from './AuthContext';
 
@@ -12,8 +12,11 @@ export function PlayerProvider({children}) {
     const [isShuffle, setIsShuffle] = useState(false);
     const [repeatMode, setRepeatMode] = useState('none');
     const [isQueuedContext, setIsQueuedContext] = useState(false);
-    const [queueSourceId, setQueueSourceId] = useState(null); // albumId hoặc artistId đang phát
+    const [queueSourceId, setQueueSourceId] = useState(null);
+    const [previewExpired, setPreviewExpired] = useState(false);
     const audioRef = useRef(new Audio());
+    const userRef = useRef(user);
+    userRef.current = user;
 
     const currentSong = currentIndex !== null ? queue[currentIndex] : null;
 
@@ -21,6 +24,7 @@ export function PlayerProvider({children}) {
         if (newQueue) setQueue(newQueue);
         setCurrentIndex(newIndex);
         setIsPlaying(true);
+        setPreviewExpired(false);
         audioRef.current.src = song.url;
         audioRef.current.load();
         audioRef.current.addEventListener('canplay', () => {
@@ -130,12 +134,27 @@ export function PlayerProvider({children}) {
         }
     };
 
+    useEffect(() => {
+        const audio = audioRef.current;
+        const handleTimeUpdate = () => {
+            if (!userRef.current && audio.currentTime >= 30) {
+                audio.pause();
+                audio.currentTime = 30;
+                setIsPlaying(false);
+                setPreviewExpired(true);
+            }
+        };
+        audio.addEventListener('timeupdate', handleTimeUpdate);
+        return () => audio.removeEventListener('timeupdate', handleTimeUpdate);
+    }, []);
+
     return (
         <PlayerContext.Provider value={{
             currentSong, isPlaying, playSong, audioRef,
             playNext, playPrev,
             isShuffle, repeatMode, toggleShuffle, toggleRepeat,
-            queue, setQueue, queueSourceId
+            queue, setQueue, queueSourceId,
+            previewExpired, setPreviewExpired
         }}>
             {children}
         </PlayerContext.Provider>

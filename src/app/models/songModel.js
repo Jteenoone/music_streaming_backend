@@ -38,6 +38,13 @@ const songSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    copyright: {
+      owner:     { type: String, default: "" },
+      license:   { type: String, default: "All rights reserved" },
+      year:      { type: Number },
+      status:    { type: String, enum: ["active", "expired", "disputed"], default: "active" },
+      expiresAt: { type: Date },
+    },
   },
   { timestamps: true },
 );
