@@ -58,4 +58,17 @@ const verifyAdmin = (req, res, next) => {
   }
 };
 
-module.exports = { verifyToken, verifyAdmin };
+/**
+ * Middleware: Đọc token nếu có, không bắt buộc — dùng cho route public nhưng cần phân biệt admin
+ */
+const optionalToken = (req, res, next) => {
+  const authHeader = req.header("Authorization");
+  const token = authHeader && authHeader.split(" ")[1];
+  if (!token) return next();
+  try {
+    req.user = jwt.verify(token, process.env.JWT_SECRET);
+  } catch {}
+  next();
+};
+
+module.exports = { verifyToken, verifyAdmin, optionalToken };

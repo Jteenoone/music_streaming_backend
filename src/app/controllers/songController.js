@@ -1,9 +1,16 @@
 const songService = require("../services/songService");
 const Artist = require("../models/artistModel");
 
+const parseCopyright = (data) => {
+  if (data.copyright && typeof data.copyright === "string") {
+    try { data.copyright = JSON.parse(data.copyright); } catch {}
+  }
+};
+
 const createSong = async (req, res) => {
   try {
     const data = { ...req.body };
+    parseCopyright(data);
 
     if (req.files && req.files.audioFile) {
       data.audioUrl = req.files.audioFile[0].path;
@@ -40,8 +47,9 @@ const getAllSongs = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
+    const showAll = req.user?.role === "admin";
 
-    const result = await songService.getAllSongsService(page, limit);
+    const result = await songService.getAllSongsService(page, limit, showAll);
 
     res.status(200).json({
       message: "Lấy danh sách bài hát thành công",
@@ -56,7 +64,8 @@ const getAllSongs = async (req, res) => {
 const getSongById = async (req, res) => {
   try {
     const songId = req.params.id;
-    const result = await songService.getSongByIdService(songId);
+    const showAll = req.user?.role === "admin";
+    const result = await songService.getSongByIdService(songId, showAll);
     if (!result.success) {
       return res.status(result.status).json({ message: result.message });
     }
@@ -70,6 +79,7 @@ const updateSong = async (req, res) => {
   try {
     const songId = req.params.id;
     const data = { ...req.body };
+    parseCopyright(data);
 
     if (req.files?.audioFile) data.audioUrl = req.files.audioFile[0].path;
     if (req.files?.coverImage) data.coverImage = req.files.coverImage[0].path;

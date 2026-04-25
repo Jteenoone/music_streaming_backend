@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const songController = require("../app/controllers/songController");
-const { verifyAdmin, verifyToken } = require("../middlewares/authMiddleware");
+const { verifyAdmin, verifyToken, optionalToken } = require("../middlewares/authMiddleware");
 const upload = require("../app/utils/cloudinaryConfig");
 
 router.post(
@@ -17,9 +17,9 @@ router.post(
 router.put("/:id/play", verifyToken, songController.incrementPlayCount);
 router.get("/trending", songController.getTrendingSong);
 router.get("/search", songController.search);
-router.get("/", songController.getAllSongs);
+router.get("/", optionalToken, songController.getAllSongs);
 router.get("/:id/recommend", songController.getRecommended);
-router.get("/:id", songController.getSongById);
+router.get("/:id", optionalToken, songController.getSongById);
 router.put(
   "/:id",
   verifyToken,

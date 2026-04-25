@@ -5,8 +5,22 @@ import { songAPI, normalizeSong } from "../../services/api";
 function SongModal({ song, onSave, onClose }) {
   const [form, setForm] = useState(
     song
-      ? { title: song.name, artistName: song.singer }
-      : { title: "", artistName: "" }
+      ? {
+          title: song.name,
+          artistName: song.singer,
+          copyrightOwner:  song.copyright?.owner  ?? "",
+          copyrightLicense:song.copyright?.license ?? "All rights reserved",
+          copyrightYear:   song.copyright?.year    ?? "",
+          copyrightStatus: song.copyright?.status  ?? "active",
+          copyrightExpiresAt: song.copyright?.expiresAt
+            ? new Date(song.copyright.expiresAt).toISOString().split("T")[0]
+            : "",
+        }
+      : {
+          title: "", artistName: "",
+          copyrightOwner: "", copyrightLicense: "All rights reserved",
+          copyrightYear: "", copyrightStatus: "active", copyrightExpiresAt: "",
+        }
   );
   const [audioFile, setAudioFile] = useState(null);
   const [coverImage, setCoverImage] = useState(null);
@@ -49,6 +63,44 @@ function SongModal({ song, onSave, onClose }) {
           <div>
             <label className="text-xs text-[#9ca3af] mb-1 block">Tên nghệ sĩ *</label>
             <input name="artistName" value={form.artistName} onChange={handleChange} placeholder="Nhập tên nghệ sĩ" className={inputCls}/>
+          </div>
+          {/* ── Bản quyền ── */}
+          <div className="border border-[#2e3450] rounded-lg p-3 flex flex-col gap-3">
+            <p className="text-xs font-semibold text-[#7c83f5] m-0">Thông tin bản quyền</p>
+            <div>
+              <label className="text-xs text-[#9ca3af] mb-1 block">Chủ sở hữu</label>
+              <input name="copyrightOwner" value={form.copyrightOwner} onChange={handleChange}
+                placeholder="VD: Sony Music Entertainment" className={inputCls}/>
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-[#9ca3af] mb-1 block">Năm</label>
+                <input name="copyrightYear" type="number" value={form.copyrightYear} onChange={handleChange}
+                  placeholder="2024" className={inputCls}/>
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-[#9ca3af] mb-1 block">Trạng thái</label>
+                <select name="copyrightStatus" value={form.copyrightStatus} onChange={handleChange} className={inputCls}>
+                  <option value="active">Đang hiệu lực</option>
+                  <option value="expired">Hết hạn</option>
+                  <option value="disputed">Đang tranh chấp</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-[#9ca3af] mb-1 block">Giấy phép</label>
+              <select name="copyrightLicense" value={form.copyrightLicense} onChange={handleChange} className={inputCls}>
+                <option>All rights reserved</option>
+                <option>CC BY</option>
+                <option>CC BY-SA</option>
+                <option>CC BY-NC</option>
+                <option>Public Domain</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-[#9ca3af] mb-1 block">Ngày hết hạn <span className="text-[#6b7280]">(để trống nếu không xác định)</span></label>
+              <input name="copyrightExpiresAt" type="date" value={form.copyrightExpiresAt} onChange={handleChange} className={inputCls}/>
+            </div>
           </div>
           <div>
             <label className="text-xs text-[#9ca3af] mb-1 block">
@@ -101,12 +153,21 @@ export default function SongManager() {
   );
 
   const handleSave = async (form, audioFile, coverImage) => {
+    const buildCopyright = () => ({
+      owner:     form.copyrightOwner,
+      license:   form.copyrightLicense,
+      year:      form.copyrightYear ? parseInt(form.copyrightYear) : undefined,
+      status:    form.copyrightStatus,
+      expiresAt: form.copyrightExpiresAt || undefined,
+    });
+
     if (modal === "add") {
       const fd = new FormData();
       fd.append("title", form.title);
       fd.append("artistName", form.artistName);
       fd.append("duration", 0);
       fd.append("genre", "Other");
+      fd.append("copyright", JSON.stringify(buildCopyright()));
       if (audioFile) fd.append("audioFile", audioFile);
       if (coverImage) fd.append("coverImage", coverImage);
       await songAPI.create(fd);
@@ -114,6 +175,7 @@ export default function SongManager() {
       const fd = new FormData();
       fd.append("title", form.title);
       fd.append("artistName", form.artistName);
+      fd.append("copyright", JSON.stringify(buildCopyright()));
       if (audioFile) fd.append("audioFile", audioFile);
       if (coverImage) fd.append("coverImage", coverImage);
       await songAPI.update(modal.id, fd);
@@ -160,6 +222,7 @@ export default function SongManager() {
             <tr className="text-[11px] uppercase tracking-wider text-[#6b7280] bg-[#232840]">
               <th className="px-5 py-3 text-left font-medium">Bài hát</th>
               <th className="px-5 py-3 text-left font-medium">Nghệ sĩ</th>
+              <th className="px-5 py-3 text-left font-medium">Bản quyền</th>
               <th className="px-5 py-3 text-right font-medium">Lượt nghe</th>
               <th className="px-5 py-3 text-right font-medium w-24">Thao tác</th>
             </tr>
@@ -178,6 +241,24 @@ export default function SongManager() {
                   </div>
                 </td>
                 <td className="px-5 py-3 text-sm text-[#9ca3af]">{song.singer}</td>
+                <td className="px-5 py-3">
+                  {(() => {
+                    const st = song.copyright?.status ?? 'active';
+                    const cfg = {
+                      active:   { label: 'Hiệu lực',     cls: 'bg-emerald-500/15 text-emerald-400' },
+                      expired:  { label: 'Hết hạn',      cls: 'bg-red-500/15 text-red-400' },
+                      disputed: { label: 'Tranh chấp',   cls: 'bg-yellow-500/15 text-yellow-400' },
+                    }[st] ?? { label: st, cls: 'bg-gray-500/15 text-gray-400' };
+                    return (
+                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${cfg.cls}`}>
+                        {cfg.label}
+                      </span>
+                    );
+                  })()}
+                  {song.copyright?.owner && (
+                    <p className="text-[11px] text-[#6b7280] m-0 mt-0.5">{song.copyright.owner}</p>
+                  )}
+                </td>
                 <td className="px-5 py-3 text-sm text-[#9ca3af] text-right">{(song.playCount ?? 0).toLocaleString()}</td>
                 <td className="px-5 py-3">
                   <div className="flex items-center justify-end gap-2">
