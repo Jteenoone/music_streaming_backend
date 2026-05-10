@@ -38,6 +38,18 @@ const songSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    isrc: {
+      type: String,
+      default: "",
+      trim: true,
+      uppercase: true,
+    },
+    iswc: {
+      type: String,
+      default: "",
+      trim: true,
+      uppercase: true,
+    },
     copyright: {
       owner:     { type: String, default: "" },
       license:   { type: String, default: "All rights reserved" },

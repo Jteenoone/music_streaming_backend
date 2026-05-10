@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { CiSearch } from "react-icons/ci";
 import { FaUserAlt } from "react-icons/fa";
 import { IoIosAdd } from "react-icons/io";
-import { MdLibraryMusic } from "react-icons/md";
+import { MdLibraryMusic, MdGavel } from "react-icons/md";
 import { artistAPI, albumAPI, normalizeAlbum, userAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -205,6 +205,17 @@ export default function Sidebar() {
                 </p>
               </div>
             )}
+          </div>
+
+          {/* Khiếu nại bản quyền */}
+          <div className="pt-3 mt-auto border-t border-[#2e3450]">
+            <button
+              onClick={() => navigate('/claims')}
+              className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-[#9ca3af] hover:text-white hover:bg-white/5 transition-colors bg-transparent border-none cursor-pointer"
+            >
+              <MdGavel size={15}/>
+              Khiếu nại bản quyền
+            </button>
           </div>
         </>
       )}

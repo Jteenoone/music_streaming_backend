@@ -59,6 +59,20 @@ const verifyAdmin = (req, res, next) => {
 };
 
 /**
+ * Middleware: Kiểm tra quyền Artist hoặc Admin
+ * Phải dùng sau verifyToken
+ */
+const verifyArtist = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: "Truy cập bị từ chối. Bạn chưa đăng nhập!" });
+  }
+  if (req.user.role === "artist" || req.user.role === "admin") {
+    return next();
+  }
+  return res.status(403).json({ success: false, message: "Từ chối truy cập. Chỉ nghệ sỹ hoặc Admin mới có quyền này!" });
+};
+
+/**
  * Middleware: Đọc token nếu có, không bắt buộc — dùng cho route public nhưng cần phân biệt admin
  */
 const optionalToken = (req, res, next) => {
@@ -71,4 +85,4 @@ const optionalToken = (req, res, next) => {
   next();
 };
 
-module.exports = { verifyToken, verifyAdmin, optionalToken };
+module.exports = { verifyToken, verifyAdmin, verifyArtist, optionalToken };

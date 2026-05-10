@@ -160,9 +160,9 @@ const search = async (req, res) => {
 
 const getRecommended = async (req, res) => {
   try {
-    // excludeIds: danh sách id bài đã nghe trong session, truyền qua query ?exclude=id1,id2
-    const excludeIds = req.query.exclude ? req.query.exclude.split(',') : [];
-    const result = await songService.getRecommendedService(req.params.id, excludeIds);
+    const excludeIds = req.query.exclude ? req.query.exclude.split(",") : [];
+    const userId = req.user?.id || null;
+    const result = await songService.getRecommendedService(req.params.id, excludeIds, userId);
     if (!result.success) return res.status(result.status).json({ message: result.message });
     res.status(200).json({ message: "Gợi ý bài hát", data: result.data });
   } catch (error) {

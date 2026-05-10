@@ -25,6 +25,8 @@ export function normalizeSong(s) {
     genre:    s.genre ?? [],
     artistId:  s.artist?._id ?? s.artist,
     albumId:   s.album?._id ?? s.album,
+    isrc:     s.isrc ?? '',
+    iswc:     s.iswc ?? '',
     copyright: s.copyright && typeof s.copyright === 'object'
       ? s.copyright
       : { owner: '', license: 'All rights reserved', year: null, status: 'active', expiresAt: null },
@@ -100,6 +102,14 @@ export const userAPI = {
   delete:          (id)            => api.delete(`/user/${id}`),
   recordPlay:      (songId)        => api.post(`/user/recently-played/${songId}`),
   getRecentlyPlayed: ()            => api.get('/user/recently-played'),
+};
+
+// ── Copyright Claims ──────────────────────────────────────────────────────────
+export const claimAPI = {
+  create:  (data)         => api.post('/claims',              data),
+  getMy:   ()             => api.get('/claims/my'),
+  getAll:  (params = {})  => api.get('/claims',               { params }),
+  resolve: (id, data)     => api.patch(`/claims/${id}/resolve`, data),
 };
 
 export default api;

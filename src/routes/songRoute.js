@@ -18,7 +18,7 @@ router.put("/:id/play", verifyToken, songController.incrementPlayCount);
 router.get("/trending", songController.getTrendingSong);
 router.get("/search", songController.search);
 router.get("/", optionalToken, songController.getAllSongs);
-router.get("/:id/recommend", songController.getRecommended);
+router.get("/:id/recommend", optionalToken, songController.getRecommended);
 router.get("/:id", optionalToken, songController.getSongById);
 router.put(
   "/:id",

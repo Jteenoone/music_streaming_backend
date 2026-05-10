@@ -21,8 +21,13 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["user", "admin"],
+      enum: ["user", "admin", "artist"],
       default: "user",
+    },
+    artistProfile: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Artist",
+      default: null,
     },
     resetPasswordOTP: {
       type: String,

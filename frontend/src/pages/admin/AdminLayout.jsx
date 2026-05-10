@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { MdDashboard, MdMusicNote, MdAlbum, MdPeople, MdPerson } from "react-icons/md";
-import { FaMusic, FaSignOutAlt } from "react-icons/fa";
+import { MdDashboard, MdMusicNote, MdAlbum, MdPeople, MdPerson, MdGavel } from "react-icons/md";
+import { FaSignOutAlt } from "react-icons/fa";
 import { useAuth } from "../../context/AuthContext";
 import logo from "../../assets/images/apple-music.jpg"
 
@@ -10,6 +10,7 @@ const navItems = [
   { to: "/admin/albums",   label: "Album",        icon: <MdAlbum size={18}/> },
   { to: "/admin/artists",  label: "Nghệ sĩ",      icon: <MdPerson size={18}/> },
   { to: "/admin/users",    label: "Người dùng",   icon: <MdPeople size={18}/> },
+  { to: "/admin/claims",   label: "Khiếu nại BQ", icon: <MdGavel size={18}/> },
 ];
 
 export default function AdminLayout() {

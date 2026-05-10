@@ -8,16 +8,19 @@ function SongModal({ song, onSave, onClose }) {
       ? {
           title: song.name,
           artistName: song.singer,
-          copyrightOwner:  song.copyright?.owner  ?? "",
-          copyrightLicense:song.copyright?.license ?? "All rights reserved",
-          copyrightYear:   song.copyright?.year    ?? "",
-          copyrightStatus: song.copyright?.status  ?? "active",
+          isrc: song.isrc ?? "",
+          iswc: song.iswc ?? "",
+          copyrightOwner:    song.copyright?.owner     ?? "",
+          copyrightLicense:  song.copyright?.license   ?? "All rights reserved",
+          copyrightYear:     song.copyright?.year      ?? "",
+          copyrightStatus:   song.copyright?.status    ?? "active",
           copyrightExpiresAt: song.copyright?.expiresAt
             ? new Date(song.copyright.expiresAt).toISOString().split("T")[0]
             : "",
         }
       : {
           title: "", artistName: "",
+          isrc: "", iswc: "",
           copyrightOwner: "", copyrightLicense: "All rights reserved",
           copyrightYear: "", copyrightStatus: "active", copyrightExpiresAt: "",
         }
@@ -47,8 +50,8 @@ function SongModal({ song, onSave, onClose }) {
   const inputCls = "w-full bg-[#232840] border border-[#2e3450] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#7c83f5] transition-colors";
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-[#1a1f35] border border-[#2e3450] rounded-xl w-full max-w-md p-6 shadow-2xl">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#1a1f35] border border-[#2e3450] rounded-xl w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-base font-semibold text-white m-0">
             {song ? "Chỉnh sửa bài hát" : "Thêm bài hát mới"}
@@ -64,6 +67,41 @@ function SongModal({ song, onSave, onClose }) {
             <label className="text-xs text-[#9ca3af] mb-1 block">Tên nghệ sĩ *</label>
             <input name="artistName" value={form.artistName} onChange={handleChange} placeholder="Nhập tên nghệ sĩ" className={inputCls}/>
           </div>
+
+          {/* ── Mã định danh âm nhạc ── */}
+          <div className="border border-[#2e3450] rounded-lg p-3 flex flex-col gap-3">
+            <p className="text-xs font-semibold text-[#a78bfa] m-0">Mã định danh âm nhạc</p>
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <label className="text-xs text-[#9ca3af] mb-1 block">
+                  ISRC
+                  <span className="text-[#6b7280] ml-1">(Bản ghi)</span>
+                </label>
+                <input
+                  name="isrc" value={form.isrc} onChange={handleChange}
+                  placeholder="VD: VNAM32400001"
+                  className={inputCls}
+                  style={{ fontFamily: 'monospace' }}
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-xs text-[#9ca3af] mb-1 block">
+                  ISWC
+                  <span className="text-[#6b7280] ml-1">(Tác phẩm)</span>
+                </label>
+                <input
+                  name="iswc" value={form.iswc} onChange={handleChange}
+                  placeholder="VD: T-123456789-0"
+                  className={inputCls}
+                  style={{ fontFamily: 'monospace' }}
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-[#6b7280] m-0">
+              ISRC xác định bản ghi âm • ISWC xác định tác phẩm âm nhạc (nhạc + lời)
+            </p>
+          </div>
+
           {/* ── Bản quyền ── */}
           <div className="border border-[#2e3450] rounded-lg p-3 flex flex-col gap-3">
             <p className="text-xs font-semibold text-[#7c83f5] m-0">Thông tin bản quyền</p>
@@ -102,6 +140,7 @@ function SongModal({ song, onSave, onClose }) {
               <input name="copyrightExpiresAt" type="date" value={form.copyrightExpiresAt} onChange={handleChange} className={inputCls}/>
             </div>
           </div>
+
           <div>
             <label className="text-xs text-[#9ca3af] mb-1 block">
               File nhạc MP3 {!song && <span className="text-[#f87171]">*</span>}
@@ -131,9 +170,17 @@ function SongModal({ song, onSave, onClose }) {
   );
 }
 
+// Loại tìm kiếm
+const SEARCH_TYPES = [
+  { value: 'name',   label: 'Tên bài hát / Nghệ sĩ' },
+  { value: 'isrc',   label: 'ISRC' },
+  { value: 'iswc',   label: 'ISWC' },
+];
+
 export default function SongManager() {
   const [songs, setSongs] = useState([]);
   const [search, setSearch] = useState("");
+  const [searchType, setSearchType] = useState("name");
   const [modal, setModal] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -147,10 +194,16 @@ export default function SongManager() {
 
   useEffect(() => { fetchSongs(); }, []);
 
-  const filtered = songs.filter(s =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.singer.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = songs.filter(s => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase().trim();
+    switch (searchType) {
+      case 'isrc': return (s.isrc ?? '').toLowerCase().includes(q);
+      case 'iswc': return (s.iswc ?? '').toLowerCase().includes(q);
+      default:
+        return s.name.toLowerCase().includes(q) || s.singer.toLowerCase().includes(q);
+    }
+  });
 
   const handleSave = async (form, audioFile, coverImage) => {
     const buildCopyright = () => ({
@@ -161,23 +214,20 @@ export default function SongManager() {
       expiresAt: form.copyrightExpiresAt || undefined,
     });
 
+    const fd = new FormData();
+    fd.append("title", form.title);
+    fd.append("artistName", form.artistName);
+    if (form.isrc) fd.append("isrc", form.isrc);
+    if (form.iswc) fd.append("iswc", form.iswc);
+    fd.append("copyright", JSON.stringify(buildCopyright()));
+    if (audioFile) fd.append("audioFile", audioFile);
+    if (coverImage) fd.append("coverImage", coverImage);
+
     if (modal === "add") {
-      const fd = new FormData();
-      fd.append("title", form.title);
-      fd.append("artistName", form.artistName);
       fd.append("duration", 0);
       fd.append("genre", "Other");
-      fd.append("copyright", JSON.stringify(buildCopyright()));
-      if (audioFile) fd.append("audioFile", audioFile);
-      if (coverImage) fd.append("coverImage", coverImage);
       await songAPI.create(fd);
     } else {
-      const fd = new FormData();
-      fd.append("title", form.title);
-      fd.append("artistName", form.artistName);
-      fd.append("copyright", JSON.stringify(buildCopyright()));
-      if (audioFile) fd.append("audioFile", audioFile);
-      if (coverImage) fd.append("coverImage", coverImage);
       await songAPI.update(modal.id, fd);
     }
     setModal(null);
@@ -206,14 +256,36 @@ export default function SongManager() {
         </button>
       </div>
 
-      <div className="flex items-center gap-2 bg-[#232840] border border-[#2e3450] rounded-lg px-3 py-2 mb-4 max-w-sm">
-        <MdSearch size={18} color="#6b7280"/>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Tìm kiếm bài hát..."
-          className="bg-transparent border-none outline-none text-sm text-white placeholder-[#6b7280] w-full"
-        />
+      {/* Thanh tìm kiếm với dropdown loại */}
+      <div className="flex items-center gap-2 mb-4">
+        <select
+          value={searchType}
+          onChange={e => { setSearchType(e.target.value); setSearch(""); }}
+          className="bg-[#232840] border border-[#2e3450] rounded-lg px-3 py-2 text-xs text-[#9ca3af] outline-none focus:border-[#7c83f5] transition-colors cursor-pointer"
+        >
+          {SEARCH_TYPES.map(t => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+        <div className="flex items-center gap-2 bg-[#232840] border border-[#2e3450] rounded-lg px-3 py-2 flex-1 max-w-sm">
+          <MdSearch size={18} color="#6b7280"/>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={
+              searchType === 'isrc' ? "Nhập mã ISRC (VD: VNAM32400001)..." :
+              searchType === 'iswc' ? "Nhập mã ISWC (VD: T-123456789-0)..." :
+              "Tìm kiếm bài hát hoặc nghệ sĩ..."
+            }
+            style={searchType !== 'name' ? { fontFamily: 'monospace' } : {}}
+            className="bg-transparent border-none outline-none text-sm text-white placeholder-[#6b7280] w-full"
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="bg-transparent border-none text-[#6b7280] cursor-pointer hover:text-white p-0 leading-none">
+              <MdClose size={15}/>
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-[#1a1f35] border border-[#2e3450] rounded-xl overflow-hidden">
@@ -222,6 +294,7 @@ export default function SongManager() {
             <tr className="text-[11px] uppercase tracking-wider text-[#6b7280] bg-[#232840]">
               <th className="px-5 py-3 text-left font-medium">Bài hát</th>
               <th className="px-5 py-3 text-left font-medium">Nghệ sĩ</th>
+              <th className="px-5 py-3 text-left font-medium">ISRC / ISWC</th>
               <th className="px-5 py-3 text-left font-medium">Bản quyền</th>
               <th className="px-5 py-3 text-right font-medium">Lượt nghe</th>
               <th className="px-5 py-3 text-right font-medium w-24">Thao tác</th>
@@ -229,9 +302,9 @@ export default function SongManager() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={4} className="px-5 py-8 text-center text-[#6b7280] text-sm">Đang tải...</td></tr>
+              <tr><td colSpan={6} className="px-5 py-8 text-center text-[#6b7280] text-sm">Đang tải...</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={4} className="px-5 py-8 text-center text-[#6b7280] text-sm">Không tìm thấy bài hát</td></tr>
+              <tr><td colSpan={6} className="px-5 py-8 text-center text-[#6b7280] text-sm">Không tìm thấy bài hát</td></tr>
             ) : filtered.map(song => (
               <tr key={song.id} className="border-t border-[#2e3450] hover:bg-white/5 transition-colors">
                 <td className="px-5 py-3">
@@ -242,12 +315,23 @@ export default function SongManager() {
                 </td>
                 <td className="px-5 py-3 text-sm text-[#9ca3af]">{song.singer}</td>
                 <td className="px-5 py-3">
+                  {song.isrc ? (
+                    <p className="text-[11px] font-mono text-[#a78bfa] m-0">{song.isrc}</p>
+                  ) : null}
+                  {song.iswc ? (
+                    <p className="text-[11px] font-mono text-[#818cf8] m-0 mt-0.5">{song.iswc}</p>
+                  ) : null}
+                  {!song.isrc && !song.iswc && (
+                    <span className="text-[11px] text-[#4b5563]">—</span>
+                  )}
+                </td>
+                <td className="px-5 py-3">
                   {(() => {
                     const st = song.copyright?.status ?? 'active';
                     const cfg = {
-                      active:   { label: 'Hiệu lực',     cls: 'bg-emerald-500/15 text-emerald-400' },
-                      expired:  { label: 'Hết hạn',      cls: 'bg-red-500/15 text-red-400' },
-                      disputed: { label: 'Tranh chấp',   cls: 'bg-yellow-500/15 text-yellow-400' },
+                      active:   { label: 'Hiệu lực',   cls: 'bg-emerald-500/15 text-emerald-400' },
+                      expired:  { label: 'Hết hạn',    cls: 'bg-red-500/15 text-red-400' },
+                      disputed: { label: 'Tranh chấp', cls: 'bg-yellow-500/15 text-yellow-400' },
                     }[st] ?? { label: st, cls: 'bg-gray-500/15 text-gray-400' };
                     return (
                       <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${cfg.cls}`}>
