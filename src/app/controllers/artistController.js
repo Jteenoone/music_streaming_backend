@@ -4,20 +4,15 @@ const artistService = require("../services/artistService");
 
 const createArtist = async (req, res) => {
   try {
-    const { name, imageUrl, bio, nationality } = req.body;
+    const { name, bio, nationality } = req.body;
+    if (!name) return res.status(400).json({ message: "Vui long nhap ten" });
 
-    if (!name) {
-      return res.status(400).json({ message: "Vui long nhap ten" });
-    }
+    const data = { ...req.body };
+    if (req.file) data.imageUrl = req.file.path;
 
-    const result = await artistService.createArtistService(req.body);
-
-    if (!result.success) {
-      return res.status(result.status).json({ message: result.message });
-    }
-    res
-      .status(201)
-      .json({ message: "Tao ca si thanh cong", data: result.data });
+    const result = await artistService.createArtistService(data);
+    if (!result.success) return res.status(result.status).json({ message: result.message });
+    res.status(201).json({ message: "Tao ca si thanh cong", data: result.data });
   } catch (error) {
     res.status(500).json({ message: "loi he thong" });
   }
@@ -58,11 +53,11 @@ const getArtistById = async (req, res) => {
 const updateArtist = async (req, res) => {
   try {
     const artistId = req.params.id;
+    const data = { ...req.body };
+    if (req.file) data.imageUrl = req.file.path;
 
-    const result = await artistService.updateArtistService(artistId, req.body);
-    if (!result.success) {
-      return res.status(result.status).json({ message: result.message });
-    }
+    const result = await artistService.updateArtistService(artistId, data);
+    if (!result.success) return res.status(result.status).json({ message: result.message });
     res.status(200).json({ message: "Da cap nhat", data: result.data });
   } catch (error) {
     res.status(500).json({ message: "loi he thong" });

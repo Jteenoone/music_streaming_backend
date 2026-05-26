@@ -1,10 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const claimController = require("../app/controllers/claimController");
-const { verifyToken, verifyAdmin } = require("../middlewares/authMiddleware");
+const { verifyToken, verifyAdmin, optionalToken } = require("../middlewares/authMiddleware");
 
-// Bất kỳ user đã đăng nhập đều có thể gửi khiếu nại
-router.post("/", verifyToken, claimController.createClaim);
+// Public — không cần đăng nhập, nhưng đọc token nếu có để gắn userId
+router.post("/", optionalToken, claimController.createClaim);
 
 // User xem khiếu nại của chính mình
 router.get("/my", verifyToken, claimController.getMyClaims);

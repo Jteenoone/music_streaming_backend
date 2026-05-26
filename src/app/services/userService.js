@@ -1,4 +1,5 @@
 const User = require("../models/userModel");
+const ListeningHistory = require("../models/listeningHistoryModel");
 
 const bcrypt = require("bcryptjs");
 
@@ -126,6 +127,10 @@ const recordPlayService = async (userId, songId) => {
   user.recentlyPlayed.unshift({ song: songId, playedAt: new Date() });
   if (user.recentlyPlayed.length > 20) user.recentlyPlayed = user.recentlyPlayed.slice(0, 20);
   await user.save();
+
+  // Ghi thêm vào ListeningHistory để phục vụ trending theo thời gian + dashboard
+  ListeningHistory.create({ user: userId, song: songId }).catch(() => {});
+
   return { success: true };
 };
 

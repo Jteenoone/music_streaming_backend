@@ -12,6 +12,7 @@ router.put(
   verifyToken,
   playlistController.removeSongFromPlaylist,
 );
+router.patch("/:id", verifyToken, playlistController.renamePlaylist);
 router.delete("/:id", verifyToken, playlistController.deletePlaylist);
 
 module.exports = router;

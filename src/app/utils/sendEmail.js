@@ -10,10 +10,10 @@ const sendEmail = async (options) => {
   });
 
   const mailOptions = {
-    from: '"Music" <' + process.env.EMAIL_USER + ">",
+    from: '"MusicStream" <' + process.env.EMAIL_USER + ">",
     to: options.email,
     subject: options.subject,
-    text: options.message,
+    ...(options.html ? { html: options.html } : { text: options.message }),
   };
 
   await transporter.sendMail(mailOptions);

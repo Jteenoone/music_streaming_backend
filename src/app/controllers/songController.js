@@ -7,10 +7,23 @@ const parseCopyright = (data) => {
   }
 };
 
+const parseGenre = (data) => {
+  if (data.genre && typeof data.genre === "string") {
+    // Có thể là JSON array string hoặc chuỗi đơn lẻ
+    try {
+      const parsed = JSON.parse(data.genre);
+      if (Array.isArray(parsed)) data.genre = parsed;
+    } catch {
+      // Không phải JSON → giữ nguyên string, Mongoose tự coerce thành [string]
+    }
+  }
+};
+
 const createSong = async (req, res) => {
   try {
     const data = { ...req.body };
     parseCopyright(data);
+    parseGenre(data);
 
     if (req.files && req.files.audioFile) {
       data.audioUrl = req.files.audioFile[0].path;
@@ -80,6 +93,7 @@ const updateSong = async (req, res) => {
     const songId = req.params.id;
     const data = { ...req.body };
     parseCopyright(data);
+    parseGenre(data);
 
     if (req.files?.audioFile) data.audioUrl = req.files.audioFile[0].path;
     if (req.files?.coverImage) data.coverImage = req.files.coverImage[0].path;
@@ -129,7 +143,8 @@ const incrementPlayCount = async (req, res) => {
 
 const getTrendingSong = async (req, res) => {
   try {
-    const result = await songService.getTrendingSongService();
+    const period = ["week", "month", "all"].includes(req.query.period) ? req.query.period : "all";
+    const result = await songService.getTrendingSongService(period);
     if (!result.success) {
       return res.status(result.status).json({ message: result.message });
     }
@@ -170,6 +185,38 @@ const getRecommended = async (req, res) => {
   }
 };
 
+const getDailyMix = async (req, res) => {
+  try {
+    const userId = req.user?.id || null;
+    const result = await songService.getDailyMixService(userId);
+    res.status(200).json({ message: "Daily mix", data: result.data });
+  } catch (error) {
+    res.status(500).json({ message: "Loi he thong", error: error.message });
+  }
+};
+
+const getListensCount = async (req, res) => {
+  try {
+    const period = ["today", "week", "month", "all"].includes(req.query.period)
+      ? req.query.period : "today";
+    const result = await songService.getListensCountService(period);
+    res.status(200).json({ message: "Listens count", ...result.data });
+  } catch (error) {
+    res.status(500).json({ message: "Loi he thong", error: error.message });
+  }
+};
+
+const getRoyaltyReport = async (req, res) => {
+  try {
+    const period = ["today", "week", "month", "all"].includes(req.query.period)
+      ? req.query.period : "month";
+    const result = await songService.getRoyaltyReportService(period);
+    res.status(200).json({ message: "Royalty report", ...result.data });
+  } catch (error) {
+    res.status(500).json({ message: "Loi he thong", error: error.message });
+  }
+};
+
 module.exports = {
   createSong,
   getAllSongs,
@@ -180,4 +227,7 @@ module.exports = {
   incrementPlayCount,
   search,
   getRecommended,
+  getDailyMix,
+  getListensCount,
+  getRoyaltyReport,
 };

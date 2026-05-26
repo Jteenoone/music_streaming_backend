@@ -2,12 +2,32 @@ import { useState, useEffect } from "react";
 import { MdAdd, MdEdit, MdDelete, MdClose, MdSearch } from "react-icons/md";
 import { songAPI, normalizeSong } from "../../services/api";
 
+const GENRES = [
+  "Pop", "V-Pop", "K-Pop", "Ballad", "R&B", "Hip-Hop",
+  "Jazz", "Rock", "EDM", "Classical", "Folk", "Indie", "Electronic", "Other",
+];
+
+// Đọc duration (giây) từ file audio bằng HTMLAudioElement
+function getAudioDuration(file) {
+  return new Promise((resolve) => {
+    const audio = new Audio();
+    audio.preload = 'metadata';
+    audio.onloadedmetadata = () => {
+      URL.revokeObjectURL(audio.src);
+      resolve(Math.round(audio.duration) || 0);
+    };
+    audio.onerror = () => resolve(0);
+    audio.src = URL.createObjectURL(file);
+  });
+}
+
 function SongModal({ song, onSave, onClose }) {
   const [form, setForm] = useState(
     song
       ? {
           title: song.name,
           artistName: song.singer,
+          genre: song.genre ?? [],
           isrc: song.isrc ?? "",
           iswc: song.iswc ?? "",
           copyrightOwner:    song.copyright?.owner     ?? "",
@@ -20,6 +40,7 @@ function SongModal({ song, onSave, onClose }) {
         }
       : {
           title: "", artistName: "",
+          genre: [],
           isrc: "", iswc: "",
           copyrightOwner: "", copyrightLicense: "All rights reserved",
           copyrightYear: "", copyrightStatus: "active", copyrightExpiresAt: "",
@@ -32,6 +53,14 @@ function SongModal({ song, onSave, onClose }) {
 
   const handleChange = (e) =>
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const toggleGenre = (g) =>
+    setForm(prev => ({
+      ...prev,
+      genre: prev.genre.includes(g)
+        ? prev.genre.filter(x => x !== g)
+        : [...prev.genre, g],
+    }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,6 +95,30 @@ function SongModal({ song, onSave, onClose }) {
           <div>
             <label className="text-xs text-[#9ca3af] mb-1 block">Tên nghệ sĩ *</label>
             <input name="artistName" value={form.artistName} onChange={handleChange} placeholder="Nhập tên nghệ sĩ" className={inputCls}/>
+          </div>
+
+          {/* ── Genre ── */}
+          <div>
+            <label className="text-xs text-[#9ca3af] mb-2 block">
+              Thể loại
+              {form.genre.length > 0 && (
+                <span className="ml-1.5 text-[#7c83f5]">({form.genre.length} đã chọn)</span>
+              )}
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {GENRES.map(g => (
+                <button
+                  key={g} type="button" onClick={() => toggleGenre(g)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
+                    form.genre.includes(g)
+                      ? 'bg-[#7c83f5] border-[#7c83f5] text-white'
+                      : 'bg-transparent border-[#2e3450] text-[#9ca3af] hover:border-[#7c83f5] hover:text-white'
+                  }`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* ── Mã định danh âm nhạc ── */}
@@ -223,9 +276,17 @@ export default function SongManager() {
     if (audioFile) fd.append("audioFile", audioFile);
     if (coverImage) fd.append("coverImage", coverImage);
 
+    // Gửi genre dưới dạng JSON string — controller parse lại thành array
+    const genres = form.genre.length > 0 ? form.genre : ["Other"];
+    fd.append("genre", JSON.stringify(genres));
+
+    // Đọc duration thật từ file audio (nếu có upload file mới)
+    if (audioFile) {
+      const duration = await getAudioDuration(audioFile);
+      fd.append("duration", duration);
+    }
+
     if (modal === "add") {
-      fd.append("duration", 0);
-      fd.append("genre", "Other");
       await songAPI.create(fd);
     } else {
       await songAPI.update(modal.id, fd);

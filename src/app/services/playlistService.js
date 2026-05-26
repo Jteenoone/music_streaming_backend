@@ -86,6 +86,16 @@ const removeSongFromPlaylistService = async (playlistId, songId, userId) => {
   return { success: true };
 };
 
+const renamePlaylistService = async (playlistId, userId, name) => {
+  const playlist = await Playlist.findOneAndUpdate(
+    { _id: playlistId, user: userId },
+    { name },
+    { new: true },
+  );
+  if (!playlist) return { success: false, status: 404, message: "Playlist not found" };
+  return { success: true, data: playlist };
+};
+
 const deletePlaylistService = async (playlistId, userId) => {
   const deletedPlaylist = await Playlist.findOneAndDelete({
     _id: playlistId,
@@ -109,5 +119,6 @@ module.exports = {
   getUserPlaylistsService,
   getPlaylistByIdService,
   removeSongFromPlaylistService,
+  renamePlaylistService,
   deletePlaylistService,
 };

@@ -60,13 +60,16 @@ export const authAPI = {
 export const songAPI = {
   getAll:    (page = 1, limit = 20)  => api.get('/songs',          { params: { page, limit } }),
   getById:   (id)                    => api.get(`/songs/${id}`),
-  getTrending:()                     => api.get('/songs/trending'),
+  getTrending:(period = 'all')        => api.get('/songs/trending', { params: { period } }),
   search:    (keyword)               => api.get('/songs/search',   { params: { keyword } }),
   create:    (formData)              => api.post('/songs',         formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   update:    (id, data)              => api.put(`/songs/${id}`,    data),
   delete:    (id)                    => api.delete(`/songs/${id}`),
   play:      (id)                    => api.put(`/songs/${id}/play`),
-  recommend: (id, excludeIds = [])   => api.get(`/songs/${id}/recommend`, { params: { exclude: excludeIds.join(',') } }),
+  recommend:   (id, excludeIds = [])  => api.get(`/songs/${id}/recommend`, { params: { exclude: excludeIds.join(',') } }),
+  getDailyMix: ()                     => api.get('/songs/daily-mix'),
+  getListensCount:  (period = 'today')  => api.get('/songs/listens-count',  { params: { period } }),
+  getRoyaltyReport: (period = 'month') => api.get('/songs/royalty-report', { params: { period } }),
 };
 
 // ── Artists ───────────────────────────────────────────────────────────────────
@@ -102,6 +105,24 @@ export const userAPI = {
   delete:          (id)            => api.delete(`/user/${id}`),
   recordPlay:      (songId)        => api.post(`/user/recently-played/${songId}`),
   getRecentlyPlayed: ()            => api.get('/user/recently-played'),
+};
+
+// ── Playlists ─────────────────────────────────────────────────────────────────
+export const playlistAPI = {
+  getAll:     ()               => api.get('/playlists'),
+  getById:    (id)             => api.get(`/playlists/${id}`),
+  create:     (name)           => api.post('/playlists',              { name }),
+  addSong:    (id, songId)     => api.post(`/playlists/${id}/add-song`,        { songId }),
+  removeSong: (id, songId)     => api.put(`/playlists/${id}/remove-song`,  { songId }),
+  rename:     (id, name)       => api.patch(`/playlists/${id}`,            { name }),
+  delete:     (id)             => api.delete(`/playlists/${id}`),
+};
+
+// ── Favorites ─────────────────────────────────────────────────────────────────
+export const favoriteAPI = {
+  toggle: (songId) => api.post('/favorites/toggle',       { songId }),
+  check:  (songId) => api.get(`/favorites/check/${songId}`),
+  getAll: ()       => api.get('/favorites'),
 };
 
 // ── Copyright Claims ──────────────────────────────────────────────────────────

@@ -21,9 +21,12 @@ import AlbumManager from "./pages/admin/AlbumManager";
 import ArtistManager from "./pages/admin/ArtistManager";
 import UserManager from "./pages/admin/UserManager";
 import ClaimManager from "./pages/admin/ClaimManager";
+import RoyaltyReport from "./pages/admin/RoyaltyReport";
 
 // User pages
 import ClaimPage from "./pages/ClaimPage";
+import PlaylistPage from "./pages/PlaylistPage";
+import FavoritesPage from "./pages/FavoritesPage";
 
 // Redirect admin away from user layout
 function UserRoute({ children }) {
@@ -41,6 +44,8 @@ function AppRoutes() {
         <Route path="artist/:id" element={<ArtistPage/>}/>
         <Route path="profile" element={<ProfilePage/>}/>
         <Route path="claims" element={<ClaimPage/>}/>
+        <Route path="playlist/:id" element={<PlaylistPage/>}/>
+        <Route path="library/favorites" element={<FavoritesPage/>}/>
       </Route>
       <Route path="/login" element={<Login/>}/>
       <Route path="/register" element={<Register/>}/>
@@ -54,6 +59,7 @@ function AppRoutes() {
         <Route path="artists" element={<ArtistManager/>}/>
         <Route path="users" element={<UserManager/>}/>
         <Route path="claims" element={<ClaimManager/>}/>
+        <Route path="royalty" element={<RoyaltyReport/>}/>
       </Route>
 
       <Route path="*" element={<NotFound/>}/>

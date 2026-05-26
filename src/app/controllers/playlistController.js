@@ -110,6 +110,18 @@ const removeSongFromPlaylist = async (req, res) => {
   }
 };
 
+const renamePlaylist = async (req, res) => {
+  try {
+    const name = req.body.name?.trim();
+    if (!name) return res.status(400).json({ message: "Ten playlist khong duoc trong" });
+    const result = await playlistService.renamePlaylistService(req.params.id, req.user.id, name);
+    if (!result.success) return res.status(result.status).json({ message: result.message });
+    res.status(200).json({ message: "Da doi ten playlist", data: result.data });
+  } catch {
+    res.status(500).json({ message: "Loi he thong" });
+  }
+};
+
 const deletePlaylist = async (req, res) => {
   try {
     const playlistId = req.params.id;
@@ -135,6 +147,7 @@ module.exports = {
   addSongToPlaylist,
   getUserPlayLists,
   getPlaylistById,
+  renamePlaylist,
   deletePlaylist,
   removeSongFromPlaylist,
 };

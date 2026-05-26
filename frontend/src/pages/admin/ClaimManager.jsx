@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { MdClose, MdCheckCircle, MdCancel, MdRefresh } from "react-icons/md";
-import { claimAPI } from "../../services/api";
+import { MdClose, MdCheckCircle, MdCancel, MdRefresh, MdLockOpen } from "react-icons/md";
+import { claimAPI, songAPI } from "../../services/api";
 
 const STATUS_TABS = [
   { value: "",         label: "Tất cả" },
@@ -15,8 +15,9 @@ const STATUS_CFG = {
   rejected: { label: "Đã từ chối",  cls: "bg-red-500/15 text-red-400"        },
 };
 
-function ResolveModal({ claim, onClose, onResolved }) {
-  const [action, setAction] = useState("approved");
+// FIX: nhận initialAction để pre-select khi click nhanh từ bảng
+function ResolveModal({ claim, initialAction = "approved", onClose, onResolved }) {
+  const [action, setAction] = useState(initialAction);
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -46,14 +47,21 @@ function ResolveModal({ claim, onClose, onResolved }) {
           <button onClick={onClose} className="bg-transparent border-none text-[#6b7280] cursor-pointer hover:text-white"><MdClose size={20}/></button>
         </div>
 
-        {/* Thông tin khiếu nại */}
         <div className="bg-[#232840] rounded-lg p-3 mb-4 flex flex-col gap-1.5">
           <p className="text-xs text-[#9ca3af] m-0">
             Bài hát: <span className="text-white font-medium">{claim.song?.title ?? "—"}</span>
           </p>
           <p className="text-xs text-[#9ca3af] m-0">
-            Người khiếu nại: <span className="text-white">{claim.claimant?.username} ({claim.claimant?.email})</span>
+            Người khiếu nại: <span className="text-white">{claim.claimantName ?? claim.claimant?.username ?? "—"}</span>
           </p>
+          <p className="text-xs text-[#9ca3af] m-0">
+            Email: <span className="text-white">{claim.claimantEmail ?? claim.claimant?.email ?? "—"}</span>
+          </p>
+          {claim.claimantOrg && (
+            <p className="text-xs text-[#9ca3af] m-0">
+              Tổ chức: <span className="text-white">{claim.claimantOrg}</span>
+            </p>
+          )}
           {claim.isrc && (
             <p className="text-xs text-[#9ca3af] m-0">
               ISRC: <span className="font-mono text-[#a78bfa]">{claim.isrc}</span>
@@ -87,7 +95,7 @@ function ResolveModal({ claim, onClose, onResolved }) {
           </div>
           <div>
             <label className="text-xs text-[#9ca3af] mb-1 block">Ghi chú Admin <span className="text-[#6b7280]">(không bắt buộc)</span></label>
-            <textarea name="note" value={note} onChange={e => setNote(e.target.value)}
+            <textarea value={note} onChange={e => setNote(e.target.value)}
               rows={3} placeholder="Lý do duyệt / từ chối..."
               className={`${inputCls} resize-none`}/>
           </div>
@@ -108,11 +116,59 @@ function ResolveModal({ claim, onClose, onResolved }) {
   );
 }
 
+function RestoreModal({ songId, songTitle, onClose, onRestored }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleRestore = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("copyright", JSON.stringify({ status: "active" }));
+      await songAPI.update(songId, fd);
+      onRestored();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.message ?? "Có lỗi xảy ra");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#1a1f35] border border-[#2e3450] rounded-xl w-full max-w-sm p-6 shadow-2xl">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold text-white m-0">Khôi phục bài hát</h3>
+          <button onClick={onClose} className="bg-transparent border-none text-[#6b7280] cursor-pointer hover:text-white"><MdClose size={20}/></button>
+        </div>
+        <p className="text-sm text-[#9ca3af] mb-1 m-0">Bạn muốn khôi phục bài hát:</p>
+        <p className="text-sm text-white font-medium mb-4 m-0">"{songTitle}"</p>
+        <p className="text-xs text-[#6b7280] mb-5 m-0">
+          Bài hát sẽ được đặt lại trạng thái <span className="text-emerald-400">active</span> và hiển thị lại với người dùng.
+          Chỉ thực hiện nếu khiếu nại bản quyền được xác nhận là không hợp lệ.
+        </p>
+        {error && <p className="text-xs text-[#f87171] mb-3 m-0">{error}</p>}
+        <div className="flex gap-3 justify-end">
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border border-[#2e3450] text-sm text-[#9ca3af] bg-transparent cursor-pointer hover:bg-white/5 transition-colors">Hủy</button>
+          <button onClick={handleRestore} disabled={loading}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#7c83f5] text-white text-sm font-medium border-none cursor-pointer hover:bg-[#6670e8] transition-colors disabled:opacity-60"
+          >
+            <MdLockOpen size={14}/>
+            {loading ? "Đang khôi phục..." : "Khôi phục"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ClaimManager() {
   const [claims, setClaims] = useState([]);
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(true);
-  const [resolveTarget, setResolveTarget] = useState(null);
+  const [resolveTarget, setResolveTarget] = useState(null); // { claim, initialAction }
+  const [restoreTarget, setRestoreTarget] = useState(null); // { songId, songTitle }
   const [pagination, setPagination] = useState({ total: 0 });
 
   const fetchClaims = useCallback(() => {
@@ -137,7 +193,6 @@ export default function ClaimManager() {
         </button>
       </div>
 
-      {/* Status filter tabs */}
       <div className="flex items-center gap-2 mb-5">
         {STATUS_TABS.map(tab => (
           <button key={tab.value} onClick={() => setStatusFilter(tab.value)}
@@ -173,11 +228,15 @@ export default function ClaimManager() {
               <tr><td colSpan={7} className="px-5 py-10 text-center text-[#6b7280] text-sm">Không có khiếu nại nào</td></tr>
             ) : claims.map(claim => {
               const cfg = STATUS_CFG[claim.status] ?? { label: claim.status, cls: 'bg-gray-500/15 text-gray-400' };
+              const songIsHidden = claim.song && claim.status === "approved";
               return (
                 <tr key={claim._id} className="border-t border-[#2e3450] hover:bg-white/5 transition-colors">
                   <td className="px-5 py-3">
-                    <p className="text-sm text-white m-0">{claim.claimant?.username ?? "—"}</p>
-                    <p className="text-[11px] text-[#6b7280] m-0">{claim.claimant?.email}</p>
+                    <p className="text-sm text-white m-0">{claim.claimantName ?? claim.claimant?.username ?? "—"}</p>
+                    <p className="text-[11px] text-[#6b7280] m-0">{claim.claimantEmail ?? claim.claimant?.email}</p>
+                    {claim.claimantOrg && (
+                      <p className="text-[10px] text-[#4b5563] m-0 italic">{claim.claimantOrg}</p>
+                    )}
                   </td>
                   <td className="px-5 py-3">
                     <p className="text-sm text-white m-0">{claim.song?.title ?? "—"}</p>
@@ -192,7 +251,7 @@ export default function ClaimManager() {
                     {claim.iswc && <p className="text-[11px] font-mono text-[#818cf8] m-0 mt-0.5">{claim.iswc}</p>}
                     {!claim.isrc && !claim.iswc && <span className="text-[11px] text-[#4b5563]">—</span>}
                   </td>
-                  <td className="px-5 py-3 max-w-[220px]">
+                  <td className="px-5 py-3 max-w-[200px]">
                     <p className="text-xs text-[#9ca3af] m-0 line-clamp-2">{claim.description}</p>
                     {claim.adminNote && (
                       <p className="text-[10px] text-[#6b7280] m-0 mt-1 italic">Admin: {claim.adminNote}</p>
@@ -207,24 +266,34 @@ export default function ClaimManager() {
                     {new Date(claim.createdAt).toLocaleDateString("vi-VN")}
                   </td>
                   <td className="px-5 py-3">
-                    <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1.5">
                       {claim.status === "pending" ? (
                         <>
+                          {/* FIX: truyền initialAction đúng */}
                           <button
-                            onClick={() => setResolveTarget(claim)}
-                            title="Duyệt"
+                            onClick={() => setResolveTarget({ claim, initialAction: "approved" })}
+                            title="Duyệt — ẩn bài hát"
                             className="p-1.5 rounded-lg bg-[#2e3450] border-none cursor-pointer text-[#9ca3af] hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
                           >
                             <MdCheckCircle size={15}/>
                           </button>
                           <button
-                            onClick={() => setResolveTarget({ ...claim, _forceReject: true })}
+                            onClick={() => setResolveTarget({ claim, initialAction: "rejected" })}
                             title="Từ chối"
                             className="p-1.5 rounded-lg bg-[#2e3450] border-none cursor-pointer text-[#9ca3af] hover:text-red-400 hover:bg-red-500/10 transition-colors"
                           >
                             <MdCancel size={15}/>
                           </button>
                         </>
+                      ) : songIsHidden ? (
+                        /* Nút khôi phục bài hát sau khi đã ẩn */
+                        <button
+                          onClick={() => setRestoreTarget({ songId: claim.song._id, songTitle: claim.song.title })}
+                          title="Khôi phục bài hát"
+                          className="flex items-center gap-1 p-1.5 rounded-lg bg-[#2e3450] border-none cursor-pointer text-[#9ca3af] hover:text-[#7c83f5] hover:bg-[#7c83f5]/10 transition-colors text-[11px]"
+                        >
+                          <MdLockOpen size={13}/> Khôi phục
+                        </button>
                       ) : (
                         <span className="text-[11px] text-[#4b5563]">Đã xử lý</span>
                       )}
@@ -242,9 +311,19 @@ export default function ClaimManager() {
 
       {resolveTarget && (
         <ResolveModal
-          claim={resolveTarget}
+          claim={resolveTarget.claim}
+          initialAction={resolveTarget.initialAction}
           onClose={() => setResolveTarget(null)}
           onResolved={fetchClaims}
+        />
+      )}
+
+      {restoreTarget && (
+        <RestoreModal
+          songId={restoreTarget.songId}
+          songTitle={restoreTarget.songTitle}
+          onClose={() => setRestoreTarget(null)}
+          onRestored={fetchClaims}
         />
       )}
     </div>

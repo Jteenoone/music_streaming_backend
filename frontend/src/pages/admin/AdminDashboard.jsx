@@ -17,13 +17,14 @@ function StatCard({ icon, label, value, color }) {
 }
 
 export default function AdminDashboard() {
-  const [songCount, setSongCount]   = useState('—');
-  const [albumCount, setAlbumCount] = useState('—');
-  const [userCount, setUserCount]   = useState('—');
-  const [trending, setTrending]     = useState([]);
+  const [songCount, setSongCount]     = useState('—');
+  const [albumCount, setAlbumCount]   = useState('—');
+  const [userCount, setUserCount]     = useState('—');
+  const [todayListens, setTodayListens] = useState('—');
+  const [trending, setTrending]       = useState([]);
 
   useEffect(() => {
-    songAPI.getAll(1, 1).then(res => setSongCount(res.data.data?.length ?? '—')).catch(() => {});
+    songAPI.getAll().then(res => setSongCount(res.data.data?.length ?? '—')).catch(() => {});
     songAPI.getTrending().then(res => {
       const songs = (res.data.data ?? []).map(normalizeSong);
       setSongCount(prev => prev === '—' ? songs.length : prev);
@@ -31,13 +32,14 @@ export default function AdminDashboard() {
     }).catch(() => {});
     albumAPI.getAll().then(res => setAlbumCount(res.data.total ?? res.data.data?.length ?? '—')).catch(() => {});
     userAPI.getAll().then(res => setUserCount(res.data.data?.length ?? '—')).catch(() => {});
+    songAPI.getListensCount('today').then(res => setTodayListens(res.data.count ?? 0)).catch(() => {});
   }, []);
 
   const stats = [
-    { icon: <MdMusicNote size={22} color="white"/>, label: "Tổng bài hát",      value: songCount,  color: "bg-[#7c83f5]" },
-    { icon: <MdAlbum size={22} color="white"/>,     label: "Tổng album",        value: albumCount, color: "bg-[#1db954]" },
-    { icon: <MdPeople size={22} color="white"/>,    label: "Người dùng",        value: userCount,  color: "bg-[#f59e0b]" },
-    { icon: <MdHeadphones size={22} color="white"/>,label: "Lượt nghe hôm nay", value: "—",        color: "bg-[#ef4444]" },
+    { icon: <MdMusicNote size={22} color="white"/>, label: "Tổng bài hát",      value: songCount,    color: "bg-[#7c83f5]" },
+    { icon: <MdAlbum size={22} color="white"/>,     label: "Tổng album",        value: albumCount,   color: "bg-[#1db954]" },
+    { icon: <MdPeople size={22} color="white"/>,    label: "Người dùng",        value: userCount,    color: "bg-[#f59e0b]" },
+    { icon: <MdHeadphones size={22} color="white"/>,label: "Lượt nghe hôm nay", value: typeof todayListens === 'number' ? todayListens.toLocaleString() : todayListens, color: "bg-[#ef4444]" },
   ];
 
   return (

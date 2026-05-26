@@ -15,8 +15,11 @@ router.post(
   songController.createSong,
 );
 router.put("/:id/play", verifyToken, songController.incrementPlayCount);
-router.get("/trending", songController.getTrendingSong);
-router.get("/search", songController.search);
+router.get("/trending",      songController.getTrendingSong);
+router.get("/search",        songController.search);
+router.get("/daily-mix",     optionalToken, songController.getDailyMix);
+router.get("/listens-count",  verifyToken, verifyAdmin, songController.getListensCount);
+router.get("/royalty-report", verifyToken, verifyAdmin, songController.getRoyaltyReport);
 router.get("/", optionalToken, songController.getAllSongs);
 router.get("/:id/recommend", optionalToken, songController.getRecommended);
 router.get("/:id", optionalToken, songController.getSongById);

@@ -1,30 +1,54 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CiSearch } from "react-icons/ci";
-import { FaUserAlt } from "react-icons/fa";
+import { FaUserAlt, FaHeart, FaTrash } from "react-icons/fa";
 import { IoIosAdd } from "react-icons/io";
-import { MdLibraryMusic, MdGavel } from "react-icons/md";
-import { artistAPI, albumAPI, normalizeAlbum, userAPI } from "../services/api";
+import { MdLibraryMusic, MdGavel, MdQueueMusic, MdCheck } from "react-icons/md";
+import { userAPI, playlistAPI, favoriteAPI, normalizeSong } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
-function LibraryItem({ srcImg, name, type, isArtist, onClick }) {
+// ── Single library row ────────────────────────────────────────────────────────
+function LibraryItem({ srcImg, name, sub, isArtist, isPlaylist, isFav, onDelete, onClick }) {
+  const [hover, setHover] = useState(false);
   return (
-    <div onClick={onClick} className="flex gap-2.5 my-1.5 items-center cursor-pointer hover:bg-white/5 rounded-lg px-1 py-0.5 transition-colors">
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      className="flex gap-2.5 my-1.5 items-center cursor-pointer hover:bg-white/5 rounded-lg px-1 py-0.5 transition-colors group"
+    >
       {srcImg
         ? <img src={srcImg} alt={name} className={`w-[46px] h-[46px] aspect-square object-cover shrink-0 ${isArtist ? 'rounded-full' : 'rounded-md'}`}/>
-        : <div className={`w-[46px] h-[46px] bg-[#2e3450] shrink-0 flex items-center justify-center text-[#6b7280] ${isArtist ? 'rounded-full' : 'rounded-md'}`}>
-            {isArtist ? <FaUserAlt size={18}/> : <span className="text-lg">♪</span>}
+        : <div className={`w-[46px] h-[46px] shrink-0 flex items-center justify-center ${
+            isFav
+              ? 'bg-gradient-to-br from-[#1db954] to-[#0a7c30] rounded-md'
+              : 'bg-[#2e3450] rounded-md'
+          } ${isArtist ? '!rounded-full' : ''}`}>
+            {isArtist
+              ? <FaUserAlt size={18} color="#6b7280"/>
+              : isFav
+                ? <FaHeart size={18} color="white"/>
+                : <MdQueueMusic size={22} color="#6b7280"/>}
           </div>
       }
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <p className="text-sm text-white m-0 truncate">{name}</p>
-        <p className="text-xs text-[#9ca3af] m-0">{type}</p>
+        <p className="text-xs text-[#9ca3af] m-0">{sub}</p>
       </div>
+      {onDelete && hover && (
+        <button
+          onClick={e => { e.stopPropagation(); onDelete(); }}
+          title="Xóa playlist"
+          className="shrink-0 bg-transparent border-none cursor-pointer text-[#6b7280] hover:text-[#f87171] p-1 transition-colors"
+        >
+          <FaTrash size={12}/>
+        </button>
+      )}
     </div>
   );
 }
 
-// Popup nhắc đăng nhập
+// ── Login prompt popup ────────────────────────────────────────────────────────
 function LoginPrompt({ onClose }) {
   const navigate = useNavigate();
   return (
@@ -32,75 +56,116 @@ function LoginPrompt({ onClose }) {
       <p className="text-sm font-bold text-white m-0 mb-1">Tạo playlist</p>
       <p className="text-xs text-white/80 m-0 mb-4">Đăng nhập để tạo và chia sẻ playlist.</p>
       <div className="flex items-center justify-between">
-        <button
-          onClick={onClose}
-          className="text-xs text-white font-semibold bg-transparent border-none cursor-pointer hover:underline"
-        >
-          Để sau
-        </button>
-        <button
-          onClick={() => navigate('/login')}
-          className="text-xs font-bold bg-white text-[#1a1f35] px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform"
-        >
-          Đăng nhập
-        </button>
+        <button onClick={onClose} className="text-xs text-white font-semibold bg-transparent border-none cursor-pointer hover:underline">Để sau</button>
+        <button onClick={() => navigate('/login')} className="text-xs font-bold bg-white text-[#1a1f35] px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform">Đăng nhập</button>
       </div>
-      {/* Arrow */}
       <div className="absolute -bottom-2 left-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-[#2d6be4]"/>
     </div>
   );
 }
 
+const TABS = [
+  { key: 'all',    label: 'Tất cả' },
+  { key: 'playlist', label: 'Playlist' },
+  { key: 'artist',   label: 'Nghệ sĩ' },
+  { key: 'album',    label: 'Album' },
+];
+
 export default function Sidebar() {
-  const [tab, setTab] = useState('all');
-  const [artists, setArtists] = useState([]);
-  const [albums, setAlbums] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
+  const [tab, setTab]               = useState('all');
+  const [artists, setArtists]       = useState([]);
+  const [albums, setAlbums]         = useState([]);
+  const [playlists, setPlaylists]   = useState([]);
+  const [favCount, setFavCount]     = useState(0);
+  const [loading, setLoading]       = useState(true);
+  const [query, setQuery]           = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
-  const focusInput = useRef(null);
-  const searchRef = useRef(null);
-  const promptRef = useRef(null);
-  const navigate = useNavigate();
-  const { user } = useAuth();
+
+  // Create-playlist form
+  const [creatingPlaylist, setCreatingPlaylist]   = useState(false);
+  const [newPlaylistName, setNewPlaylistName]     = useState('');
+  const [createLoading, setCreateLoading]         = useState(false);
+  const [createDone, setCreateDone]               = useState(false);
+
+  const focusInput     = useRef(null);
+  const searchRef      = useRef(null);
+  const promptRef      = useRef(null);
+  const createInputRef = useRef(null);
+  const navigate       = useNavigate();
+  const { user }       = useAuth();
 
   const fetchLibrary = () => {
     if (!user) { setLoading(false); return; }
     setLoading(true);
-    userAPI.getLibrary()
-      .then(res => {
-        const lib = res.data.data ?? {};
-        setArtists(lib.artists ?? []);
-        setAlbums((lib.albums ?? []).map(a => ({
-          id: a._id, name: a.title, image: a.coverImage ?? '', singer: '', artistId: a.artist,
-        })));
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      userAPI.getLibrary(),
+      playlistAPI.getAll().catch(() => ({ data: { data: [] } })),
+      favoriteAPI.getAll().catch(() => ({ data: { data: [], total: 0 } })),
+    ]).then(([libRes, plRes, favRes]) => {
+      const lib = libRes.data.data ?? {};
+      setArtists(lib.artists ?? []);
+      setAlbums((lib.albums ?? []).map(a => ({
+        id: a._id, name: a.title, image: a.coverImage ?? '', singer: '',
+      })));
+      setPlaylists(plRes.data.data ?? []);
+      setFavCount(favRes.data.total ?? (favRes.data.data ?? []).length);
+    })
+    .catch(() => {})
+    .finally(() => setLoading(false));
   };
 
   useEffect(() => { fetchLibrary(); }, [user]);
   useEffect(() => { if (showSearch) focusInput.current?.focus(); }, [showSearch]);
+  useEffect(() => { if (creatingPlaylist) createInputRef.current?.focus(); }, [creatingPlaylist]);
 
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (searchRef.current && !searchRef.current.contains(e.target) && !query)
-        setShowSearch(false);
-      if (promptRef.current && !promptRef.current.contains(e.target))
-        setShowLoginPrompt(false);
+    function handleOutside(e) {
+      if (searchRef.current && !searchRef.current.contains(e.target) && !query) setShowSearch(false);
+      if (promptRef.current && !promptRef.current.contains(e.target)) setShowLoginPrompt(false);
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
   }, [query]);
 
-  const q = query.toLowerCase();
-  const filteredArtists = artists.filter(a => a.name.toLowerCase().includes(q));
-  const filteredAlbums  = albums.filter(a => a.name.toLowerCase().includes(q));
-  const showArtists = tab === 'all' || tab === 'artist';
-  const showAlbums  = tab === 'all' || tab === 'album';
+  const handleCreatePlaylist = async (e) => {
+    e?.preventDefault();
+    const name = newPlaylistName.trim();
+    if (!name || createLoading) return;
+    setCreateLoading(true);
+    try {
+      const res = await playlistAPI.create(name);
+      setPlaylists(prev => [res.data.data, ...prev]);
+      setNewPlaylistName('');
+      setCreateDone(true);
+      setTimeout(() => { setCreatingPlaylist(false); setCreateDone(false); }, 700);
+    } catch {}
+    finally { setCreateLoading(false); }
+  };
 
-  const isEmpty = !loading && filteredArtists.length === 0 && filteredAlbums.length === 0;
+  const handleDeletePlaylist = async (id) => {
+    try {
+      await playlistAPI.delete(id);
+      setPlaylists(prev => prev.filter(p => p._id !== id));
+    } catch {}
+  };
+
+  const q                 = query.toLowerCase();
+  const filteredArtists   = artists.filter(a => a.name?.toLowerCase().includes(q));
+  const filteredAlbums    = albums.filter(a => a.name?.toLowerCase().includes(q));
+  const filteredPlaylists = playlists.filter(p => p.name?.toLowerCase().includes(q));
+
+  const showPlaylists = tab === 'all' || tab === 'playlist';
+  const showArtists   = tab === 'all' || tab === 'artist';
+  const showAlbums    = tab === 'all' || tab === 'album';
+  // Favorites card shown in 'all' and 'playlist' tabs
+  const showFav = (tab === 'all' || tab === 'playlist') && !q;
+
+  const noResults = !loading
+    && filteredArtists.length  === 0
+    && filteredAlbums.length   === 0
+    && filteredPlaylists.length === 0
+    && !showFav;
 
   return (
     <div className="flex h-full flex-col text-white p-4">
@@ -109,8 +174,9 @@ export default function Sidebar() {
         <h3 className="text-sm font-bold uppercase tracking-wider text-[#9ca3af]">Thư viện</h3>
         <div className="relative" ref={promptRef}>
           <button
-            onClick={() => user ? null : setShowLoginPrompt(v => !v)}
-            className="flex items-center gap-1 text-xs text-[#9ca3af] hover:text-white bg-transparent border-none cursor-pointer transition-colors p-1 rounded-full hover:bg-white/5"
+            onClick={() => user ? setCreatingPlaylist(v => !v) : setShowLoginPrompt(v => !v)}
+            title="Tạo playlist mới"
+            className="flex items-center text-xs text-[#9ca3af] hover:text-white bg-transparent border-none cursor-pointer transition-colors p-1 rounded-full hover:bg-white/5"
           >
             <IoIosAdd size={20}/>
           </button>
@@ -118,40 +184,56 @@ export default function Sidebar() {
         </div>
       </div>
 
-      {/* Khi chưa đăng nhập: luôn hiện card mời */}
+      {/* Not logged in */}
       {!user && (
         <div className="flex flex-col gap-3 mt-2">
           <div className="bg-[#1a1f35] rounded-xl p-4">
             <p className="text-sm font-bold text-white m-0 mb-1">Tạo playlist đầu tiên</p>
             <p className="text-xs text-[#9ca3af] m-0 mb-3">Dễ lắm, để tụi mình giúp bạn.</p>
-            <button
-              onClick={() => setShowLoginPrompt(true)}
-              className="text-xs font-bold text-[#1a1f35] bg-white px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform"
-            >
-              Tạo playlist
-            </button>
+            <button onClick={() => setShowLoginPrompt(true)} className="text-xs font-bold text-[#1a1f35] bg-white px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform">Tạo playlist</button>
           </div>
           <div className="bg-[#1a1f35] rounded-xl p-4">
             <p className="text-sm font-bold text-white m-0 mb-1">Theo dõi nghệ sĩ yêu thích</p>
             <p className="text-xs text-[#9ca3af] m-0 mb-3">Thông tin từ các nghệ sĩ bạn theo dõi sẽ xuất hiện ở đây.</p>
-            <button
-              onClick={() => setShowLoginPrompt(true)}
-              className="text-xs font-bold text-[#1a1f35] bg-white px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform"
-            >
-              Đăng nhập
-            </button>
+            <button onClick={() => setShowLoginPrompt(true)} className="text-xs font-bold text-[#1a1f35] bg-white px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform">Đăng nhập</button>
           </div>
         </div>
       )}
 
-      {/* Khi đã đăng nhập */}
+      {/* Logged in */}
       {user && (
         <>
-          {/* Filter tabs */}
-          <div className="flex items-center gap-2 mb-3 flex-wrap">
-            {[['all', 'Tất cả'], ['artist', 'Nghệ sĩ'], ['album', 'Album']].map(([key, label]) => (
+          {/* Create-playlist inline form */}
+          {creatingPlaylist && (
+            <form onSubmit={handleCreatePlaylist} className="mb-3 flex items-center gap-2">
+              <input
+                ref={createInputRef}
+                type="text"
+                placeholder="Tên playlist..."
+                value={newPlaylistName}
+                onChange={e => setNewPlaylistName(e.target.value)}
+                className="flex-1 h-8 px-3 bg-[#2e3450] text-sm text-white rounded-lg border border-[#333] outline-none focus:border-[#7c83f5] transition-colors min-w-0"
+              />
+              <button
+                type="submit"
+                disabled={!newPlaylistName.trim() || createLoading}
+                className="h-8 px-3 bg-[#7c83f5] text-white text-xs font-semibold rounded-lg border-none cursor-pointer hover:bg-[#6670e8] disabled:opacity-50 disabled:cursor-not-allowed shrink-0 flex items-center gap-1"
+              >
+                {createDone ? <MdCheck size={14}/> : createLoading ? '...' : 'Tạo'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setCreatingPlaylist(false); setNewPlaylistName(''); }}
+                className="h-8 px-2 text-[#9ca3af] text-xs bg-transparent border-none cursor-pointer hover:text-white shrink-0"
+              >✕</button>
+            </form>
+          )}
+
+          {/* Tabs */}
+          <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+            {TABS.map(({ key, label }) => (
               <button key={key} onClick={() => setTab(key)}
-                className={`text-xs rounded-full px-3 py-1 border transition-colors ${
+                className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${
                   tab === key ? 'bg-white text-[#1E2237] border-white font-semibold' : 'border-[#333] bg-[#1E2237] hover:bg-white/10'
                 }`}
               >{label}</button>
@@ -177,48 +259,78 @@ export default function Sidebar() {
           <div className="flex-1 overflow-y-auto">
             {loading && <p className="text-xs text-[#6b7280] py-2">Đang tải...</p>}
 
+            {/* Favorites card (single, always first when visible) */}
+            {!loading && showFav && (
+              <LibraryItem
+                isFav
+                name="Bài hát yêu thích"
+                sub={`${favCount} bài hát`}
+                onClick={() => navigate('/library/favorites')}
+              />
+            )}
+
+            {/* Playlists */}
+            {!loading && showPlaylists && filteredPlaylists.length > 0 && (
+              <>
+                {tab === 'all' && <p className="text-[10px] uppercase tracking-widest text-[#6b7280] mb-1 mt-2">Playlist</p>}
+                {filteredPlaylists.map(pl => (
+                  <LibraryItem
+                    key={pl._id}
+                    isPlaylist
+                    name={pl.name}
+                    sub="Playlist"
+                    onClick={() => navigate(`/playlist/${pl._id}`)}
+                    onDelete={() => handleDeletePlaylist(pl._id)}
+                  />
+                ))}
+              </>
+            )}
+
+            {/* Artists */}
             {!loading && showArtists && filteredArtists.length > 0 && (
               <>
-                {tab === 'all' && <p className="text-[10px] uppercase tracking-widest text-[#6b7280] mb-1 mt-1">Nghệ sĩ</p>}
+                {tab === 'all' && <p className="text-[10px] uppercase tracking-widest text-[#6b7280] mb-1 mt-3">Nghệ sĩ</p>}
                 {filteredArtists.map(a => (
-                  <LibraryItem key={a._id} srcImg={a.imageUrl} name={a.name} type="Nghệ sĩ" isArtist
+                  <LibraryItem key={a._id} srcImg={a.imageUrl} name={a.name} sub="Nghệ sĩ" isArtist
                     onClick={() => navigate(`/artist/${a._id}`)}/>
                 ))}
               </>
             )}
 
+            {/* Albums */}
             {!loading && showAlbums && filteredAlbums.length > 0 && (
               <>
                 {tab === 'all' && <p className="text-[10px] uppercase tracking-widest text-[#6b7280] mb-1 mt-3">Album</p>}
                 {filteredAlbums.map(a => (
-                  <LibraryItem key={a.id} srcImg={a.image} name={a.name} type={`Album · ${a.singer}`} isArtist={false}
+                  <LibraryItem key={a.id} srcImg={a.image} name={a.name} sub={`Album · ${a.singer}`}
                     onClick={() => navigate(`/album/${a.id}`)}/>
                 ))}
               </>
             )}
 
-            {!loading && user && filteredArtists.length === 0 && filteredAlbums.length === 0 && (
+            {/* Empty */}
+            {!loading && noResults && (
               <div className="flex flex-col items-center gap-2 py-8 text-center">
                 <MdLibraryMusic size={36} color="#6b7280"/>
                 <p className="text-xs text-[#6b7280] m-0">
-                  {query ? `Không tìm thấy "${query}"` : 'Hãy theo dõi nghệ sĩ hoặc lưu album để thêm vào thư viện'}
+                  {query ? `Không tìm thấy "${query}"` : 'Thư viện trống'}
                 </p>
               </div>
             )}
           </div>
-
-          {/* Khiếu nại bản quyền */}
-          <div className="pt-3 mt-auto border-t border-[#2e3450]">
-            <button
-              onClick={() => navigate('/claims')}
-              className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-[#9ca3af] hover:text-white hover:bg-white/5 transition-colors bg-transparent border-none cursor-pointer"
-            >
-              <MdGavel size={15}/>
-              Khiếu nại bản quyền
-            </button>
-          </div>
         </>
       )}
+
+      {/* Always visible */}
+      <div className="pt-3 mt-auto border-t border-[#2e3450]">
+        <button
+          onClick={() => navigate('/claims')}
+          className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-[#9ca3af] hover:text-white hover:bg-white/5 transition-colors bg-transparent border-none cursor-pointer"
+        >
+          <MdGavel size={15}/>
+          Khiếu nại bản quyền
+        </button>
+      </div>
     </div>
   );
 }

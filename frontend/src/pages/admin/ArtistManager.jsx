@@ -6,19 +6,28 @@ import { artistAPI } from "../../services/api";
 function ArtistModal({ artist, onSave, onClose }) {
   const [form, setForm] = useState(
     artist
-      ? { name: artist.name, imageUrl: artist.imageUrl ?? '', bio: artist.bio ?? '', nationality: artist.nationality ?? '' }
-      : { name: '', imageUrl: '', bio: '', nationality: '' }
+      ? { name: artist.name, bio: artist.bio ?? '', nationality: artist.nationality ?? '' }
+      : { name: '', bio: '', nationality: '' }
   );
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [imageFile, setImageFile]     = useState(null);
+  const [previewUrl, setPreviewUrl]   = useState(artist?.imageUrl ?? '');
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
 
   const handleChange = (e) => setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImageFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim()) return;
     setLoading(true); setError('');
-    try { await onSave(form); }
+    try { await onSave(form, imageFile); }
     catch (err) { setError(err.response?.data?.message ?? 'Có lỗi xảy ra'); }
     finally { setLoading(false); }
   };
@@ -37,10 +46,30 @@ function ArtistModal({ artist, onSave, onClose }) {
             <label className="text-xs text-[#9ca3af] mb-1 block">Tên nghệ sĩ *</label>
             <input name="name" value={form.name} onChange={handleChange} placeholder="Nhập tên nghệ sĩ" className={inputCls}/>
           </div>
+
+          {/* Ảnh đại diện */}
           <div>
-            <label className="text-xs text-[#9ca3af] mb-1 block">URL ảnh</label>
-            <input name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="https://..." className={inputCls}/>
+            <label className="text-xs text-[#9ca3af] mb-1.5 block">
+              Ảnh đại diện
+              {artist && <span className="text-[#4b5563] ml-1">(để trống nếu không thay đổi)</span>}
+            </label>
+            <div className="flex items-center gap-3">
+              {previewUrl ? (
+                <img src={previewUrl} alt="preview" className="w-14 h-14 rounded-full object-cover shrink-0 border border-[#2e3450]"/>
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-[#232840] border border-[#2e3450] flex items-center justify-center shrink-0">
+                  <FaUserAlt size={20} color="#4b5563"/>
+                </div>
+              )}
+              <label className="flex-1 cursor-pointer">
+                <div className="bg-[#232840] border border-[#2e3450] hover:border-[#7c83f5] rounded-lg px-3 py-2 text-sm text-[#9ca3af] hover:text-white transition-colors text-center">
+                  {imageFile ? imageFile.name : 'Chọn ảnh...'}
+                </div>
+                <input type="file" accept="image/*" onChange={handleImageChange} className="hidden"/>
+              </label>
+            </div>
           </div>
+
           <div>
             <label className="text-xs text-[#9ca3af] mb-1 block">Quốc tịch</label>
             <input name="nationality" value={form.nationality} onChange={handleChange} placeholder="Việt Nam, Hàn Quốc..." className={inputCls}/>
@@ -80,11 +109,17 @@ export default function ArtistManager() {
 
   useEffect(() => { fetchArtists(); }, []);
 
-  const handleSave = async (form) => {
+  const handleSave = async (form, imageFile) => {
+    const fd = new FormData();
+    fd.append('name', form.name);
+    if (form.nationality) fd.append('nationality', form.nationality);
+    if (form.bio)         fd.append('bio', form.bio);
+    if (imageFile)        fd.append('imageFile', imageFile);
+
     if (modal === 'add') {
-      await artistAPI.create(form);
+      await artistAPI.create(fd);
     } else {
-      await artistAPI.update(modal._id, form);
+      await artistAPI.update(modal._id, fd);
     }
     setModal(null);
     fetchArtists();
