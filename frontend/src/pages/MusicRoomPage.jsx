@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { socket } from "../services/socket";
 import { songAPI, normalizeSong } from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import { FaPlay, FaPause, FaUserAlt, FaCrown, FaSignOutAlt, FaCopy, FaPaperPlane } from "react-icons/fa";
+import { FaPlay, FaPause, FaUserAlt, FaCrown, FaSignOutAlt, FaCopy, FaPaperPlane, FaStepForward, FaPlus, FaTrash } from "react-icons/fa";
 import { MdMusicNote } from "react-icons/md";
 
 function formatTime(s) {
@@ -31,12 +31,19 @@ export default function MusicRoomPage() {
   const [duration, setDuration] = useState(0);
   const [needsInteraction, setNeedsInteraction] = useState(false);
 
-  // Chat & danh sách bài (host)
+  // Chat, tìm bài & hàng chờ chung
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [search, setSearch] = useState("");
   const [songResults, setSongResults] = useState([]);
+  const [queue, setQueue] = useState([]);
   const chatEndRef = useRef(null);
+
+  // Refs để handler 'ended' đọc được giá trị mới nhất (tránh closure cũ)
+  const isHostRef = useRef(isHost);
+  const queueRef = useRef(queue);
+  isHostRef.current = isHost;
+  queueRef.current = queue;
 
   // ── Nạp 1 bài hát vào audio và tua tới vị trí cho trước ────────────────────
   const loadSong = (song, position = 0, play = true) => {
@@ -61,6 +68,7 @@ export default function MusicRoomPage() {
       setMessages((m) => [...m, { system: true, text, at: Date.now() }])
     );
     socket.on("chat:message", (msg) => setMessages((m) => [...m, msg]));
+    socket.on("queue:update", setQueue);
 
     socket.on("sync:song", ({ song, position, isPlaying }) => {
       setCurrentSong(song);
@@ -94,11 +102,17 @@ export default function MusicRoomPage() {
     const audio = audioRef.current;
     const onTime = () => setCurrentTime(audio.currentTime);
     const onMeta = () => setDuration(audio.duration);
+    // Hết bài: chỉ host mới điều khiển — phát bài kế tiếp trong hàng chờ
+    const onEnded = () => {
+      if (isHostRef.current && queueRef.current.length > 0) socket.emit("host:next");
+    };
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("loadedmetadata", onMeta);
+    audio.addEventListener("ended", onEnded);
     return () => {
       audio.removeEventListener("timeupdate", onTime);
       audio.removeEventListener("loadedmetadata", onMeta);
+      audio.removeEventListener("ended", onEnded);
     };
   }, []);
 
@@ -111,6 +125,7 @@ export default function MusicRoomPage() {
     setRoomId(res.roomId);
     setIsHost(res.isHost);
     setMembers(res.members || []);
+    setQueue(res.queue || []);
     setPhase("room");
     if (res.song) {
       setCurrentSong(res.song);
@@ -146,7 +161,14 @@ export default function MusicRoomPage() {
     setIsPlaying(false);
     setMembers([]);
     setMessages([]);
+    setQueue([]);
   };
+
+  // ── Hàng chờ chung — mọi người đều thêm/xóa được ───────────────────────────
+  const addToQueue = (song) => socket.emit("queue:add", { song });
+  const removeFromQueue = (uid) => socket.emit("queue:remove", { uid });
+  const playNext = () => { if (isHost) socket.emit("host:next"); };
+  const playFromQueue = (uid) => { if (isHost) socket.emit("host:playFromQueue", { uid }); };
 
   // ── Host điều khiển ────────────────────────────────────────────────────────
   const handleSearch = async (e) => {
@@ -296,6 +318,16 @@ export default function MusicRoomPage() {
                     >
                       {isPlaying ? <FaPause size={18} color="#1a1f35" /> : <FaPlay size={18} color="#1a1f35" />}
                     </button>
+                    {isHost && (
+                      <button
+                        onClick={playNext}
+                        disabled={queue.length === 0}
+                        title="Phát bài tiếp theo trong hàng chờ"
+                        className="bg-transparent border-none cursor-pointer text-white p-1 rounded-full hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        <FaStepForward size={16} />
+                      </button>
+                    )}
                     <span className="text-xs text-[#9ca3af] min-w-[36px]">{formatTime(currentTime)}</span>
                     <input
                       type="range"
@@ -326,37 +358,88 @@ export default function MusicRoomPage() {
             )}
           </div>
 
-          {/* Host: tìm & chọn bài */}
-          {isHost && (
-            <div className="bg-[#1a1f35] rounded-2xl p-5">
-              <form onSubmit={handleSearch} className="flex gap-2 mb-3">
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Tìm bài hát để phát cho cả phòng..."
-                  className="flex-1 h-10 px-3 bg-[#2e3450] text-white rounded-lg border-none outline-none"
-                />
-                <button type="submit" className="px-4 bg-[#7c83f5] text-white rounded-lg border-none cursor-pointer hover:bg-[#6670e8]">
-                  Tìm
-                </button>
-              </form>
-              <div className="max-h-[260px] overflow-y-auto">
-                {songResults.map((s) => (
-                  <div
-                    key={s.id}
-                    onClick={() => pickSong(s)}
-                    className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 cursor-pointer"
+          {/* Tìm bài — ai cũng thêm vào hàng chờ được; host có thể phát ngay */}
+          <div className="bg-[#1a1f35] rounded-2xl p-5 mb-5">
+            <form onSubmit={handleSearch} className="flex gap-2 mb-3">
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Tìm bài hát để thêm vào hàng chờ..."
+                className="flex-1 h-10 px-3 bg-[#2e3450] text-white rounded-lg border-none outline-none"
+              />
+              <button type="submit" className="px-4 bg-[#7c83f5] text-white rounded-lg border-none cursor-pointer hover:bg-[#6670e8]">
+                Tìm
+              </button>
+            </form>
+            <div className="max-h-[240px] overflow-y-auto">
+              {songResults.map((s) => (
+                <div key={s.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 group">
+                  <img src={s.src_img} alt="" className="w-10 h-10 rounded object-cover bg-[#2e3450]" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm m-0 truncate">{s.name}</p>
+                    <p className="text-xs text-[#9ca3af] m-0 truncate">{s.singer}</p>
+                  </div>
+                  <button
+                    onClick={() => addToQueue(s)}
+                    title="Thêm vào hàng chờ"
+                    className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-[#2e3450] text-white rounded-lg border-none cursor-pointer hover:bg-[#3a4060] shrink-0"
                   >
-                    <img src={s.src_img} alt="" className="w-10 h-10 rounded object-cover bg-[#2e3450]" />
-                    <div className="min-w-0">
-                      <p className="text-sm m-0 truncate">{s.name}</p>
-                      <p className="text-xs text-[#9ca3af] m-0 truncate">{s.singer}</p>
+                    <FaPlus size={10} /> Hàng chờ
+                  </button>
+                  {isHost && (
+                    <button
+                      onClick={() => pickSong(s)}
+                      title="Phát ngay cho cả phòng"
+                      className="text-xs px-2.5 py-1.5 bg-[#7c83f5] text-white rounded-lg border-none cursor-pointer hover:bg-[#6670e8] shrink-0"
+                    >
+                      Phát ngay
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Hàng chờ chung */}
+          <div className="bg-[#1a1f35] rounded-2xl p-5">
+            <p className="text-xs uppercase tracking-wider text-[#6b7280] m-0 mb-3">
+              Hàng chờ chung ({queue.length})
+            </p>
+            {queue.length === 0 ? (
+              <p className="text-sm text-[#6b7280] m-0">Chưa có bài nào — tìm và thêm bài để cả phòng cùng nghe.</p>
+            ) : (
+              <div className="flex flex-col gap-1 max-h-[240px] overflow-y-auto">
+                {queue.map((item, i) => (
+                  <div key={item.uid} className="flex items-center gap-3 p-2 rounded-lg hover:bg-white/5 group">
+                    <span className="text-xs text-[#6b7280] w-5 text-center shrink-0">{i + 1}</span>
+                    <img src={item.song.src_img} alt="" className="w-9 h-9 rounded object-cover bg-[#2e3450]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm m-0 truncate">{item.song.name}</p>
+                      <p className="text-xs text-[#9ca3af] m-0 truncate">
+                        {item.song.singer} · <span className="text-[#6b7280]">thêm bởi {item.addedBy}</span>
+                      </p>
                     </div>
+                    {isHost && (
+                      <button
+                        onClick={() => playFromQueue(item.uid)}
+                        title="Phát bài này ngay"
+                        className="opacity-0 group-hover:opacity-100 w-8 h-8 flex items-center justify-center bg-white rounded-full border-none cursor-pointer shrink-0 transition-opacity hover:scale-105"
+                      >
+                        <FaPlay size={11} color="#1a1f35" />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => removeFromQueue(item.uid)}
+                      title="Xóa khỏi hàng chờ"
+                      className="opacity-0 group-hover:opacity-100 text-[#6b7280] hover:text-[#f87171] bg-transparent border-none cursor-pointer shrink-0 transition-opacity"
+                    >
+                      <FaTrash size={12} />
+                    </button>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Cột phải: thành viên + chat */}

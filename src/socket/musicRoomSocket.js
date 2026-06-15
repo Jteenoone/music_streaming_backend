@@ -28,6 +28,7 @@ function roomSnapshot(room) {
     isPlaying: room.isPlaying,
     position: effectivePosition(room),
     hostId: room.hostId,
+    queue: room.queue,
   };
 }
 
@@ -53,6 +54,7 @@ function setup(io) {
         isPlaying: false,
         position: 0,
         updatedAt: Date.now(),
+        queue: [], // hàng chờ chung: [{ uid, song, addedBy }]
       };
       rooms.set(roomId, room);
       socket.join(roomId);
@@ -122,6 +124,57 @@ function setup(io) {
       room.position = position ?? 0;
       room.updatedAt = Date.now();
       socket.to(currentRoomId).emit("sync:seek", { position: room.position });
+    });
+
+    // ── Hàng chờ chung — mọi thành viên đều thêm / xóa được ──────────────────
+    socket.on("queue:add", ({ song } = {}) => {
+      const room = rooms.get(currentRoomId);
+      if (!room || !song) return;
+      const member = room.members.get(socket.id);
+      const item = {
+        uid: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        song,
+        addedBy: member?.name || "Khách",
+      };
+      room.queue.push(item);
+      io.to(currentRoomId).emit("queue:update", room.queue);
+      io.to(currentRoomId).emit("room:system", `${item.addedBy} đã thêm "${song.name}" vào hàng chờ`);
+    });
+
+    socket.on("queue:remove", ({ uid } = {}) => {
+      const room = rooms.get(currentRoomId);
+      if (!room) return;
+      room.queue = room.queue.filter((i) => i.uid !== uid);
+      io.to(currentRoomId).emit("queue:update", room.queue);
+    });
+
+    // Host chọn phát NGAY một bài cụ thể trong hàng chờ (và lấy nó ra khỏi hàng chờ)
+    socket.on("host:playFromQueue", ({ uid } = {}) => {
+      const room = requireHost();
+      if (!room) return;
+      const item = room.queue.find((i) => i.uid === uid);
+      if (!item) return;
+      room.queue = room.queue.filter((i) => i.uid !== uid);
+      room.song = item.song;
+      room.position = 0;
+      room.isPlaying = true;
+      room.updatedAt = Date.now();
+      io.to(currentRoomId).emit("sync:song", { song: item.song, position: 0, isPlaying: true });
+      io.to(currentRoomId).emit("queue:update", room.queue);
+    });
+
+    // Host phát bài kế tiếp trong hàng chờ (bấm "tiếp" hoặc khi bài hiện tại kết thúc)
+    socket.on("host:next", () => {
+      const room = requireHost();
+      if (!room || room.queue.length === 0) return;
+      const item = room.queue.shift();
+      room.song = item.song;
+      room.position = 0;
+      room.isPlaying = true;
+      room.updatedAt = Date.now();
+      // Gửi cho TOÀN phòng (kể cả host) để mọi người cùng nạp bài mới
+      io.to(currentRoomId).emit("sync:song", { song: item.song, position: 0, isPlaying: true });
+      io.to(currentRoomId).emit("queue:update", room.queue);
     });
 
     // ── Chat trong phòng ─────────────────────────────────────────────────────
