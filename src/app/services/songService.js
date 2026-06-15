@@ -472,7 +472,7 @@ const getRoyaltyReportService = async (period = "month") => {
   const rows = await ListeningHistory.aggregate([
     matchStage,
     { $lookup: { from: "songs", localField: "song", foreignField: "_id", as: "s" } },
-    { $unwind: { path: "$s", preserveNullAndEmpty: false } },
+    { $unwind: { path: "$s", preserveNullAndEmptyArrays: false } },
     {
       $group: {
         _id: { $ifNull: [{ $trim: { input: "$s.copyright.owner" } }, ""] },
