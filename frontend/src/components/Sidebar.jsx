@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { CiSearch } from "react-icons/ci";
 import { FaUserAlt, FaHeart, FaTrash } from "react-icons/fa";
 import { IoIosAdd } from "react-icons/io";
-import { MdLibraryMusic, MdGavel, MdQueueMusic, MdCheck } from "react-icons/md";
+import { MdLibraryMusic, MdGavel, MdQueueMusic, MdCheck, MdGroups } from "react-icons/md";
 import { userAPI, playlistAPI, favoriteAPI, normalizeSong } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -323,6 +323,13 @@ export default function Sidebar() {
 
       {/* Always visible */}
       <div className="pt-3 mt-auto border-t border-[#2e3450]">
+        <button
+          onClick={() => navigate('/room')}
+          className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-[#9ca3af] hover:text-white hover:bg-white/5 transition-colors bg-transparent border-none cursor-pointer"
+        >
+          <MdGroups size={17}/>
+          Phòng nghe chung
+        </button>
         <button
           onClick={() => navigate('/claims')}
           className="flex items-center gap-2 w-full px-2 py-2 rounded-lg text-xs text-[#9ca3af] hover:text-white hover:bg-white/5 transition-colors bg-transparent border-none cursor-pointer"

@@ -1,4 +1,4 @@
-const User = require("../models/userModel");
+﻿const User = require("../models/userModel");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { sendEmail } = require("../utils/sendEmail");
@@ -36,7 +36,7 @@ const registerService = async (username, email, password) => {
       message: message,
     });
   } catch (error) {
-    console.log("Lỗi gửi email");
+    console.error("Loi gui email:", error?.message || error);
   }
 
   return {

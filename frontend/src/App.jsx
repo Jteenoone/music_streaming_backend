@@ -27,6 +27,7 @@ import RoyaltyReport from "./pages/admin/RoyaltyReport";
 import ClaimPage from "./pages/ClaimPage";
 import PlaylistPage from "./pages/PlaylistPage";
 import FavoritesPage from "./pages/FavoritesPage";
+import MusicRoomPage from "./pages/MusicRoomPage";
 
 // Redirect admin away from user layout
 function UserRoute({ children }) {
@@ -46,6 +47,7 @@ function AppRoutes() {
         <Route path="claims" element={<ClaimPage/>}/>
         <Route path="playlist/:id" element={<PlaylistPage/>}/>
         <Route path="library/favorites" element={<FavoritesPage/>}/>
+        <Route path="room" element={<MusicRoomPage/>}/>
       </Route>
       <Route path="/login" element={<Login/>}/>
       <Route path="/register" element={<Register/>}/>
