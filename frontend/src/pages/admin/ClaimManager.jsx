@@ -228,7 +228,10 @@ export default function ClaimManager() {
               <tr><td colSpan={7} className="px-5 py-10 text-center text-[#6b7280] text-sm">Không có khiếu nại nào</td></tr>
             ) : claims.map(claim => {
               const cfg = STATUS_CFG[claim.status] ?? { label: claim.status, cls: 'bg-gray-500/15 text-gray-400' };
-              const songIsHidden = claim.song && claim.status === "approved";
+              // Bài đã duyệt: nếu copyright vẫn "disputed" → còn đang ẩn (hiện nút khôi phục);
+              // nếu đã về "active" → đã khôi phục (hiện nhãn)
+              const songIsHidden  = claim.song && claim.status === "approved" && claim.song.copyright?.status === "disputed";
+              const songRestored  = claim.song && claim.status === "approved" && claim.song.copyright?.status !== "disputed";
               return (
                 <tr key={claim._id} className="border-t border-[#2e3450] hover:bg-white/5 transition-colors">
                   <td className="px-5 py-3">
@@ -294,6 +297,10 @@ export default function ClaimManager() {
                         >
                           <MdLockOpen size={13}/> Khôi phục
                         </button>
+                      ) : songRestored ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">
+                          <MdLockOpen size={12}/> Đã khôi phục
+                        </span>
                       ) : (
                         <span className="text-[11px] text-[#4b5563]">Đã xử lý</span>
                       )}

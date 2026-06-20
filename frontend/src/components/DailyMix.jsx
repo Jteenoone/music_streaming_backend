@@ -12,20 +12,8 @@ export default function DailyMix() {
     setLoading(true);
     songAPI.getDailyMix()
       .then((res) => {
-        const mixes = res.data.data ?? [];
-        // Gộp tất cả bài từ các mix, loại trùng theo ID
-        const seen = new Set();
-        const flat = [];
-        for (const mix of mixes) {
-          for (const s of mix.songs) {
-            const normalized = normalizeSong(s);
-            if (normalized && !seen.has(normalized.id)) {
-              seen.add(normalized.id);
-              flat.push(normalized);
-            }
-          }
-        }
-        setSongs(flat);
+        const list = (res.data.data ?? []).map(normalizeSong).filter(Boolean);
+        setSongs(list);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

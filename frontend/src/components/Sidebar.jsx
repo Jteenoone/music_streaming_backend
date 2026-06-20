@@ -48,18 +48,26 @@ function LibraryItem({ srcImg, name, sub, isArtist, isPlaylist, isFav, onDelete,
   );
 }
 
-// ── Login prompt popup ────────────────────────────────────────────────────────
-function LoginPrompt({ onClose }) {
+// ── Login prompt modal (nổi giữa màn hình, không nằm trong sidebar) ────────────
+// title/desc cho phép tái sử dụng cho nhiều ngữ cảnh (tạo playlist, theo dõi nghệ sĩ...)
+function LoginModal({ onClose, title = 'Tạo playlist', desc = 'Đăng nhập để tạo và chia sẻ playlist.' }) {
   const navigate = useNavigate();
   return (
-    <div className="absolute bottom-full left-0 mb-2 w-[220px] bg-[#2d6be4] rounded-xl p-4 shadow-2xl z-50">
-      <p className="text-sm font-bold text-white m-0 mb-1">Tạo playlist</p>
-      <p className="text-xs text-white/80 m-0 mb-4">Đăng nhập để tạo và chia sẻ playlist.</p>
-      <div className="flex items-center justify-between">
-        <button onClick={onClose} className="text-xs text-white font-semibold bg-transparent border-none cursor-pointer hover:underline">Để sau</button>
-        <button onClick={() => navigate('/login')} className="text-xs font-bold bg-white text-[#1a1f35] px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform">Đăng nhập</button>
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        className="w-full max-w-[360px] bg-[#2d6be4] rounded-2xl p-6 shadow-2xl"
+      >
+        <p className="text-lg font-bold text-white m-0 mb-2">{title}</p>
+        <p className="text-sm text-white/80 m-0 mb-6">{desc}</p>
+        <div className="flex items-center justify-end gap-2">
+          <button onClick={onClose} className="text-sm text-white font-semibold bg-transparent border-none cursor-pointer hover:underline px-2">Để sau</button>
+          <button onClick={() => navigate('/login')} className="text-sm font-bold bg-white text-[#1a1f35] px-5 py-2 rounded-full border-none cursor-pointer hover:scale-105 transition-transform">Đăng nhập</button>
+        </div>
       </div>
-      <div className="absolute -bottom-2 left-6 w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-[#2d6be4]"/>
     </div>
   );
 }
@@ -81,6 +89,7 @@ export default function Sidebar() {
   const [query, setQuery]           = useState('');
   const [showSearch, setShowSearch] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [cardPrompt, setCardPrompt] = useState(null); // 'playlist' | 'artist' | null
 
   // Create-playlist form
   const [creatingPlaylist, setCreatingPlaylist]   = useState(false);
@@ -180,7 +189,7 @@ export default function Sidebar() {
           >
             <IoIosAdd size={20}/>
           </button>
-          {showLoginPrompt && <LoginPrompt onClose={() => setShowLoginPrompt(false)}/>}
+          {showLoginPrompt && <LoginModal onClose={() => setShowLoginPrompt(false)}/>}
         </div>
       </div>
 
@@ -190,14 +199,30 @@ export default function Sidebar() {
           <div className="bg-[#1a1f35] rounded-xl p-4">
             <p className="text-sm font-bold text-white m-0 mb-1">Tạo playlist đầu tiên</p>
             <p className="text-xs text-[#9ca3af] m-0 mb-3">Dễ lắm, để tụi mình giúp bạn.</p>
-            <button onClick={() => setShowLoginPrompt(true)} className="text-xs font-bold text-[#1a1f35] bg-white px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform">Tạo playlist</button>
+            <button onClick={() => setCardPrompt('playlist')} className="text-xs font-bold text-[#1a1f35] bg-white px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform">Tạo playlist</button>
           </div>
           <div className="bg-[#1a1f35] rounded-xl p-4">
             <p className="text-sm font-bold text-white m-0 mb-1">Theo dõi nghệ sĩ yêu thích</p>
             <p className="text-xs text-[#9ca3af] m-0 mb-3">Thông tin từ các nghệ sĩ bạn theo dõi sẽ xuất hiện ở đây.</p>
-            <button onClick={() => setShowLoginPrompt(true)} className="text-xs font-bold text-[#1a1f35] bg-white px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform">Đăng nhập</button>
+            <button onClick={() => setCardPrompt('artist')} className="text-xs font-bold text-[#1a1f35] bg-white px-4 py-1.5 rounded-full border-none cursor-pointer hover:scale-105 transition-transform">Đăng nhập</button>
           </div>
         </div>
+      )}
+
+      {/* Modal đăng nhập nổi giữa màn hình (ngoài sidebar) */}
+      {cardPrompt === 'playlist' && (
+        <LoginModal
+          onClose={() => setCardPrompt(null)}
+          title="Tạo playlist"
+          desc="Đăng nhập để tạo và chia sẻ playlist."
+        />
+      )}
+      {cardPrompt === 'artist' && (
+        <LoginModal
+          onClose={() => setCardPrompt(null)}
+          title="Theo dõi nghệ sĩ"
+          desc="Đăng nhập để theo dõi nghệ sĩ yêu thích."
+        />
       )}
 
       {/* Logged in */}

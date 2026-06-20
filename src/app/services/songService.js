@@ -70,7 +70,11 @@ const updateSongService = async (songId, data) => {
     return { success: false, status: 404, message: "Không tìm thấy bài hát" };
   }
   if (data.copyright && typeof data.copyright === "object") {
-    Object.assign(song.copyright, data.copyright);
+    // Mot so bai hat cu co the luu copyright sai dinh dang (chuoi/undefined).
+    // Gan lai ca object thay vi Object.assign tai cho de tranh loi.
+    const raw = song.toObject().copyright;
+    const current = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    song.copyright = { ...current, ...data.copyright };
     delete data.copyright;
   }
   Object.assign(song, data);
@@ -153,7 +157,7 @@ const getTrendingSongService = async (period = "all") => {
   ]);
 
   // Nếu ListeningHistory chưa có đủ data → fallback về all-time
-  if (trending.length < 5) {
+  if (trending.length < 4) {
     const fallback = await Song.find(getAvailableFilter())
       .sort({ playCount: -1 })
       .limit(10)
@@ -353,12 +357,12 @@ const getRecommendedService = async (songId, excludeIds = [], userId = null) => 
 };
 
 // ── Daily Mix ────────────────────────────────────────────────────────────────
-// Trả về 2-3 playlist card: 1 trending hôm nay + 1-2 genre từ sở thích user
+// Trả về 1 danh sách bài gợi ý: trending 24h + bài theo genre sở thích user
 const getDailyMixService = async (userId) => {
   const availFilter  = getAvailableFilter();
   const since24h     = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  // Trending trong 24h — dùng để boost và tạo mix đầu tiên
+  // Trending trong 24h — vừa để boost, vừa làm phần đầu danh sách
   const todayAgg = await ListeningHistory.aggregate([
     { $match: { listenedAt: { $gte: since24h } } },
     { $group: { _id: "$song", count: { $sum: 1 } } },
@@ -367,9 +371,19 @@ const getDailyMixService = async (userId) => {
   ]);
   const todayTrendingIds = new Set(todayAgg.map((t) => t._id.toString()));
 
-  const mixes = [];
+  // Gom bài vào 1 danh sách phẳng, khử trùng theo _id
+  const seen   = new Set();
+  const result = [];
+  const pushSongs = (songs) => {
+    for (const s of songs) {
+      const id = s._id.toString();
+      if (seen.has(id)) continue;
+      seen.add(id);
+      result.push(s);
+    }
+  };
 
-  // ── Mix "Trending hôm nay" (luôn có) ─────────────────────────────────────
+  // ── Trending hôm nay (luôn có) ───────────────────────────────────────────
   let trendSongs;
   if (todayAgg.length >= 5) {
     const ids = todayAgg.slice(0, 20).map((t) => t._id);
@@ -382,18 +396,9 @@ const getDailyMixService = async (userId) => {
     trendSongs = await Song.find(availFilter)
       .sort({ playCount: -1 }).limit(20).populate("artist", "name imageUrl");
   }
+  pushSongs(trendSongs);
 
-  if (trendSongs.length >= 3) {
-    mixes.push({
-      id:          "trending-today",
-      title:       "Trending Hôm Nay",
-      description: "Nghe nhiều nhất trong 24 giờ qua",
-      gradient:    ["#7c3aed", "#2563eb"],
-      songs:       trendSongs,
-    });
-  }
-
-  // ── Mix dựa trên genre sở thích (chỉ khi đã đăng nhập) ───────────────────
+  // ── Bài theo genre sở thích  ───────────────────────
   if (userId) {
     const [recentHistory, liked] = await Promise.all([
       ListeningHistory.find({ user: userId }).sort({ listenedAt: -1 }).limit(50).select("song"),
@@ -412,21 +417,8 @@ const getDailyMixService = async (userId) => {
       const topGenres = Object.entries(genreScore)
         .sort((a, b) => b[1] - a[1]).slice(0, 2).map(([g]) => g);
 
-      const GENRE_COLORS = {
-        Pop:     ["#db2777", "#9333ea"],
-        "R&B":   ["#059669", "#0891b2"],
-        "Hip-Hop":["#d97706", "#dc2626"],
-        Jazz:    ["#1d4ed8", "#7c3aed"],
-        Rock:    ["#dc2626", "#92400e"],
-        Ballad:  ["#0891b2", "#1d4ed8"],
-        EDM:     ["#7c3aed", "#db2777"],
-        Classical:["#0f766e", "#1d4ed8"],
-      };
-      const DEFAULT_COLORS = [["#4f46e5", "#0891b2"], ["#065f46", "#1e40af"]];
-
-      for (let i = 0; i < topGenres.length; i++) {
-        const genre = topGenres[i];
-        const pool  = await Song.find({ ...availFilter, genre: { $in: [genre] } })
+      for (const genre of topGenres) {
+        const pool = await Song.find({ ...availFilter, genre: { $in: [genre] } })
           .populate("artist", "name imageUrl").limit(50);
 
         // Bài trending hôm nay lên trước, còn lại sort theo playCount
@@ -437,20 +429,12 @@ const getDailyMixService = async (userId) => {
           return (b.playCount ?? 0) - (a.playCount ?? 0);
         });
 
-        if (pool.length >= 3) {
-          mixes.push({
-            id:          `mix-${genre.toLowerCase().replace(/\s+/g, "-")}`,
-            title:       `Daily Mix ${mixes.length + 1}`,
-            description: genre,
-            gradient:    GENRE_COLORS[genre] ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length],
-            songs:       pool.slice(0, 20),
-          });
-        }
+        pushSongs(pool.slice(0, 20));
       }
     }
   }
 
-  return { success: true, data: mixes };
+  return { success: true, data: result };
 };
 
 // ── Royalty Report ───────────────────────────────────────────────────────────

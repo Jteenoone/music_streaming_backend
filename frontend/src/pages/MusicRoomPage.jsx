@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { socket } from "../services/socket";
-import { songAPI, normalizeSong } from "../services/api";
+import { songAPI, userAPI, normalizeSong } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { FaPlay, FaPause, FaUserAlt, FaCrown, FaSignOutAlt, FaCopy, FaPaperPlane, FaStepForward, FaPlus, FaTrash } from "react-icons/fa";
 import { MdMusicNote } from "react-icons/md";
@@ -14,6 +15,7 @@ function formatTime(s) {
 
 export default function MusicRoomPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const audioRef = useRef(null);
   if (!audioRef.current) audioRef.current = new Audio();
 
@@ -30,6 +32,9 @@ export default function MusicRoomPage() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [needsInteraction, setNeedsInteraction] = useState(false);
+  //  cho người dùng tự chọn có tính nhạc
+  // nghe trong phòng vào lịch sử & gợi ý cá nhân của mình hay không
+  const [countToHistory, setCountToHistory] = useState(true);
 
   // Chat, tìm bài & hàng chờ chung
   const [messages, setMessages] = useState([]);
@@ -44,6 +49,20 @@ export default function MusicRoomPage() {
   const queueRef = useRef(queue);
   isHostRef.current = isHost;
   queueRef.current = queue;
+
+  // Refs để handler 'sync:song' (đăng ký 1 lần) luôn đọc được giá trị mới nhất
+  const countToHistoryRef = useRef(countToHistory);
+  const userRef = useRef(user);
+  countToHistoryRef.current = countToHistory;
+  userRef.current = user;
+
+  // ── Tính 1 lượt nghe cho CHÍNH người dùng (giống nghe nhạc thường) ──────────
+  // Chỉ ghi khi đã đăng nhập và bật công tắc "tính vào lịch sử".
+  const recordListen = (song) => {
+    if (!song?.id || !userRef.current || !countToHistoryRef.current) return;
+    songAPI.play(song.id).catch(() => {});        // tăng playCount công khai của bài
+    userAPI.recordPlay(song.id).catch(() => {});  // recentlyPlayed + ListeningHistory (gợi ý)
+  };
 
   // ── Nạp 1 bài hát vào audio và tua tới vị trí cho trước ────────────────────
   const loadSong = (song, position = 0, play = true) => {
@@ -60,10 +79,11 @@ export default function MusicRoomPage() {
 
   // ── Kết nối socket + đăng ký sự kiện đồng bộ (chạy 1 lần) ───────────────────
   useEffect(() => {
+    if (!user) return; // khách chưa đăng nhập không kết nối phòng
     socket.connect();
 
     socket.on("room:members", setMembers);
-    socket.on("room:host", (hostId) => setIsHost(hostId === socket.id));
+    socket.on("room:host", (hostId) => setIsHost(hostId === user.id));
     socket.on("room:system", (text) =>
       setMessages((m) => [...m, { system: true, text, at: Date.now() }])
     );
@@ -74,6 +94,7 @@ export default function MusicRoomPage() {
       setCurrentSong(song);
       setIsPlaying(isPlaying);
       loadSong(song, position, isPlaying);
+      recordListen(song); // tính lượt nghe vào lịch sử của mình (nếu đã bật)
     });
     socket.on("sync:play", ({ position }) => {
       audioRef.current.currentTime = position;
@@ -89,13 +110,23 @@ export default function MusicRoomPage() {
       audioRef.current.currentTime = position;
     });
 
+    // Tự vào lại phòng đã lưu sau khi reload trang (server giữ chỗ trong ~20s)
+    const savedRoom = localStorage.getItem("musicRoomId");
+    if (savedRoom) {
+      socket.emit("room:join", { roomId: savedRoom, name: user.username || "Khách" }, (res) => {
+        if (res?.ok) applySnapshot(res);
+        else localStorage.removeItem("musicRoomId");
+      });
+    }
+
     return () => {
-      socket.emit("room:leave");
+      // KHÔNG emit room:leave ở đây: để khi reload/rời trang server dùng grace period.
+      // Rời phòng dứt khoát chỉ qua nút "Rời phòng".
       socket.off();
       socket.disconnect();
       audioRef.current.pause();
     };
-  }, []);
+  }, [user]);
 
   // ── Cập nhật thanh thời gian ───────────────────────────────────────────────
   useEffect(() => {
@@ -122,6 +153,7 @@ export default function MusicRoomPage() {
 
   // ── Tạo / vào phòng ────────────────────────────────────────────────────────
   const applySnapshot = (res) => {
+    localStorage.setItem("musicRoomId", res.roomId); // nhớ phòng để tự vào lại sau reload
     setRoomId(res.roomId);
     setIsHost(res.isHost);
     setMembers(res.members || []);
@@ -131,6 +163,7 @@ export default function MusicRoomPage() {
       setCurrentSong(res.song);
       setIsPlaying(res.isPlaying);
       loadSong(res.song, res.position, res.isPlaying);
+      recordListen(res.song); // vào phòng đang phát dở cũng tính là đang nghe bài này
     }
   };
 
@@ -153,6 +186,7 @@ export default function MusicRoomPage() {
   };
 
   const leaveRoom = () => {
+    localStorage.removeItem("musicRoomId"); // rời dứt khoát → không tự vào lại nữa
     socket.emit("room:leave");
     audioRef.current.pause();
     setPhase("lobby");
@@ -189,6 +223,7 @@ export default function MusicRoomPage() {
     setNeedsInteraction(false);
     loadSong(song, 0, true);
     socket.emit("host:song", { song });
+    recordListen(song); // host phát ngay không nhận lại sync:song nên ghi tại đây
   };
 
   const togglePlay = () => {
@@ -225,6 +260,42 @@ export default function MusicRoomPage() {
   };
 
   const copyCode = () => navigator.clipboard?.writeText(roomId);
+
+  // ── Khách chưa đăng nhập — bắt buộc đăng nhập mới vào được phòng ────────────
+  if (!user) {
+    return (
+      <div className="max-w-[480px] mx-auto mt-10 text-white">
+        <div className="flex items-center gap-3 mb-2">
+          <MdMusicNote size={32} className="text-[#7c83f5]" />
+          <h1 className="text-2xl font-bold m-0">Phòng nghe chung</h1>
+        </div>
+        <p className="text-sm text-[#9ca3af] mb-6">
+          Nghe nhạc đồng bộ realtime cùng bạn bè — chủ phòng phát, mọi người nghe cùng lúc.
+        </p>
+
+        <div className="bg-[#2d6be4] rounded-2xl p-6">
+          <p className="text-lg font-bold text-white m-0 mb-1.5">Đăng nhập để vào phòng nghe chung</p>
+          <p className="text-sm text-white/80 m-0 mb-5">
+            Bạn cần đăng nhập để tạo phòng, vào phòng và nghe nhạc cùng bạn bè.
+          </p>
+          <div className="flex items-center justify-end gap-2">
+            <button
+              onClick={() => navigate("/")}
+              className="text-sm text-white font-semibold bg-transparent border-none cursor-pointer hover:underline px-2"
+            >
+              Để sau
+            </button>
+            <button
+              onClick={() => navigate("/login")}
+              className="text-sm font-bold bg-white text-[#1a1f35] px-5 py-2 rounded-full border-none cursor-pointer hover:scale-105 transition-transform"
+            >
+              Đăng nhập
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Lobby ──────────────────────────────────────────────────────────────────
   if (phase === "lobby") {
@@ -457,12 +528,27 @@ export default function MusicRoomPage() {
                   </div>
                   <span className="text-sm truncate flex-1">
                     {m.name}
-                    {m.id === socket.id && <span className="text-[#6b7280]"> (bạn)</span>}
+                    {m.id === user.id && <span className="text-[#6b7280]"> (bạn)</span>}
                   </span>
                   {m.isHost && <FaCrown size={13} color="#fbbf24" title="Chủ phòng" />}
                 </div>
               ))}
             </div>
+
+            {/* Công tắc riêng tư kiểu Spotify Private Session */}
+            {user && (
+              <label className="flex items-start gap-2 mt-4 pt-3 border-t border-[#2e3450] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={countToHistory}
+                  onChange={(e) => setCountToHistory(e.target.checked)}
+                  className="mt-0.5 accent-[#7c83f5] cursor-pointer shrink-0"
+                />
+                <span className="text-xs text-[#9ca3af] leading-snug">
+                  Tính nhạc nghe trong phòng vào lịch sử & gợi ý của tôi
+                </span>
+              </label>
+            )}
           </div>
 
           {/* Chat */}

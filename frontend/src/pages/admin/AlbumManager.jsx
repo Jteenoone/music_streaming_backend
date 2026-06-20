@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { MdAdd, MdEdit, MdDelete, MdClose, MdSearch, MdLibraryMusic } from "react-icons/md";
-import { albumAPI, songAPI, normalizeAlbum, normalizeSong } from "../../services/api";
+import { albumAPI, songAPI, artistAPI, normalizeAlbum, normalizeSong } from "../../services/api";
 
 function AlbumModal({ album, onSave, onClose }) {
   const [form, setForm] = useState(
@@ -11,6 +11,13 @@ function AlbumModal({ album, onSave, onClose }) {
   const [coverFile, setCoverFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [artists, setArtists] = useState([]);
+
+  useEffect(() => {
+    artistAPI.getAll()
+      .then(res => setArtists(res.data.data ?? []))
+      .catch(() => {});
+  }, []);
 
   const handleChange = (e) =>
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
@@ -46,8 +53,13 @@ function AlbumModal({ album, onSave, onClose }) {
             <input name="title" value={form.title} onChange={handleChange} placeholder="Nhập tên album" className={inputCls}/>
           </div>
           <div>
-            <label className="text-xs text-[#9ca3af] mb-1 block">ID nghệ sĩ *</label>
-            <input name="artistId" value={form.artistId} onChange={handleChange} placeholder="MongoDB ObjectId của nghệ sĩ" className={inputCls}/>
+            <label className="text-xs text-[#9ca3af] mb-1 block">Nghệ sĩ *</label>
+            <select name="artistId" value={form.artistId} onChange={handleChange} className={inputCls}>
+              <option value="">— Chọn nghệ sĩ —</option>
+              {artists.map(a => (
+                <option key={a._id} value={a._id}>{a.name}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-xs text-[#9ca3af] mb-1 block">

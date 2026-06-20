@@ -1,9 +1,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Music Room — nghe nhạc realtime cùng nhau qua WebSocket (Socket.io)
 // Trạng thái mỗi phòng lưu trong bộ nhớ (Map), không cần MongoDB cho phần realtime.
+//
+// Thành viên được định danh theo userId (JWT), KHÔNG theo socket.id — vì socket.id
+// đổi mỗi lần reload. Nhờ đó hỗ trợ "grace period": reload trang không bị mất phòng.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const rooms = new Map(); // roomId -> { hostId, members: Map<socketId,{name}>, song, isPlaying, position, updatedAt }
+const jwt = require("jsonwebtoken");
+
+const rooms = new Map(); // roomId -> { hostId(userId), members: Map<userId,{name,socketId}>, song, isPlaying, position, updatedAt, queue }
+
+// Hẹn giờ xóa thành viên sau khi mất kết nối (cho phép quay lại trong GRACE_MS)
+const leaveTimers = new Map(); // `${roomId}:${userId}` -> Timeout
+const GRACE_MS = 20000;        // 20 giây
+const timerKey = (roomId, userId) => `${roomId}:${userId}`;
 
 // Sinh mã phòng 6 ký tự (chữ in hoa + số), không trùng phòng đang mở
 function genRoomId() {
@@ -33,23 +43,75 @@ function roomSnapshot(room) {
 }
 
 function memberList(room) {
-  return [...room.members.entries()].map(([id, m]) => ({
-    id,
+  return [...room.members.entries()].map(([userId, m]) => ({
+    id: userId,
     name: m.name,
-    isHost: id === room.hostId,
+    isHost: userId === room.hostId,
   }));
 }
 
 function setup(io) {
+  // ── Xác thực JWT khi kết nối: chỉ user đã đăng nhập mới vào được phòng ──────
+  io.use((socket, next) => {
+    try {
+      const token = socket.handshake.auth?.token;
+      if (!token) return next(new Error("UNAUTHENTICATED"));
+      const payload = jwt.verify(token, process.env.JWT_SECRET);
+      socket.userId = payload.id;
+      next();
+    } catch {
+      next(new Error("UNAUTHENTICATED"));
+    }
+  });
+
   io.on("connection", (socket) => {
     let currentRoomId = null;
+
+    // ── Helper: hẹn giờ / hủy hẹn giờ xóa thành viên ─────────────────────────
+    const clearLeaveTimer = (roomId, userId) => {
+      const k = timerKey(roomId, userId);
+      if (leaveTimers.has(k)) {
+        clearTimeout(leaveTimers.get(k));
+        leaveTimers.delete(k);
+      }
+    };
+
+    const scheduleLeave = (roomId, userId) => {
+      clearLeaveTimer(roomId, userId);
+      const t = setTimeout(() => {
+        leaveTimers.delete(timerKey(roomId, userId));
+        removeMember(roomId, userId);
+      }, GRACE_MS);
+      leaveTimers.set(timerKey(roomId, userId), t);
+    };
+
+    // ── Xóa thành viên thật sự (sau grace, hoặc khi bấm rời phòng) ────────────
+    const removeMember = (roomId, userId) => {
+      const room = rooms.get(roomId);
+      if (!room) return;
+      const member = room.members.get(userId);
+      if (!member) return;
+      room.members.delete(userId);
+
+      if (room.members.size === 0) {
+        rooms.delete(roomId); // phòng trống thì xóa
+        return;
+      }
+      // Nếu host rời đi, chuyển quyền cho người đầu tiên còn lại
+      if (room.hostId === userId) {
+        room.hostId = room.members.keys().next().value;
+        io.to(roomId).emit("room:host", room.hostId);
+      }
+      io.to(roomId).emit("room:members", memberList(room));
+      io.to(roomId).emit("room:system", `${member.name || "Một người"} đã rời phòng`);
+    };
 
     // ── Tạo phòng ──────────────────────────────────────────────────────────
     socket.on("room:create", ({ name } = {}, cb) => {
       const roomId = genRoomId();
       const room = {
-        hostId: socket.id,
-        members: new Map([[socket.id, { name: name || "Khách" }]]),
+        hostId: socket.userId,
+        members: new Map([[socket.userId, { name: name || "Khách", socketId: socket.id }]]),
         song: null,
         isPlaying: false,
         position: 0,
@@ -62,31 +124,36 @@ function setup(io) {
       cb?.({ ok: true, roomId, isHost: true, ...roomSnapshot(room), members: memberList(room) });
     });
 
-    // ── Vào phòng ──────────────────────────────────────────────────────────
+    // ── Vào phòng (cũng dùng để quay lại sau khi reload) ─────────────────────
     socket.on("room:join", ({ roomId, name } = {}, cb) => {
       const room = rooms.get(roomId);
       if (!room) return cb?.({ ok: false, error: "Phòng không tồn tại" });
 
-      room.members.set(socket.id, { name: name || "Khách" });
+      const rejoining = room.members.has(socket.userId); // đã là thành viên → đây là quay lại sau reload
+      clearLeaveTimer(roomId, socket.userId);            // hủy hẹn xóa nếu có
+
+      room.members.set(socket.userId, { name: name || "Khách", socketId: socket.id });
       socket.join(roomId);
       currentRoomId = roomId;
 
       cb?.({
         ok: true,
         roomId,
-        isHost: socket.id === room.hostId,
+        isHost: socket.userId === room.hostId,
         ...roomSnapshot(room),
         members: memberList(room),
       });
-      // Báo cả phòng cập nhật danh sách thành viên
       io.to(roomId).emit("room:members", memberList(room));
-      socket.to(roomId).emit("room:system", `${name || "Một người"} đã tham gia phòng`);
+      // Chỉ báo "đã tham gia" với người vào MỚI, không báo khi chỉ là reload quay lại
+      if (!rejoining) {
+        socket.to(roomId).emit("room:system", `${name || "Một người"} đã tham gia phòng`);
+      }
     });
 
     // ── Host điều khiển: đổi bài / play / pause / seek ───────────────────────
     const requireHost = () => {
       const room = rooms.get(currentRoomId);
-      if (!room || room.hostId !== socket.id) return null;
+      if (!room || room.hostId !== socket.userId) return null;
       return room;
     };
 
@@ -130,7 +197,7 @@ function setup(io) {
     socket.on("queue:add", ({ song } = {}) => {
       const room = rooms.get(currentRoomId);
       if (!room || !song) return;
-      const member = room.members.get(socket.id);
+      const member = room.members.get(socket.userId);
       const item = {
         uid: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         song,
@@ -181,7 +248,7 @@ function setup(io) {
     socket.on("chat:message", ({ text } = {}) => {
       const room = rooms.get(currentRoomId);
       if (!room || !text) return;
-      const member = room.members.get(socket.id);
+      const member = room.members.get(socket.userId);
       io.to(currentRoomId).emit("chat:message", {
         name: member?.name || "Khách",
         text: String(text).slice(0, 500),
@@ -189,30 +256,27 @@ function setup(io) {
       });
     });
 
-    // ── Rời phòng / ngắt kết nối ─────────────────────────────────────────────
-    const leaveRoom = () => {
-      const room = rooms.get(currentRoomId);
-      if (!room) return;
-      const member = room.members.get(socket.id);
-      room.members.delete(socket.id);
+    // ── Rời phòng chủ động (bấm nút) → xóa NGAY, không chờ grace ──────────────
+    socket.on("room:leave", () => {
+      if (!currentRoomId) return;
+      clearLeaveTimer(currentRoomId, socket.userId);
       socket.leave(currentRoomId);
-
-      if (room.members.size === 0) {
-        rooms.delete(currentRoomId); // phòng trống thì xóa
-      } else {
-        // Nếu host rời đi, chuyển quyền cho người đầu tiên còn lại
-        if (room.hostId === socket.id) {
-          room.hostId = room.members.keys().next().value;
-          io.to(currentRoomId).emit("room:host", room.hostId);
-        }
-        io.to(currentRoomId).emit("room:members", memberList(room));
-        io.to(currentRoomId).emit("room:system", `${member?.name || "Một người"} đã rời phòng`);
-      }
+      removeMember(currentRoomId, socket.userId);
       currentRoomId = null;
-    };
+    });
 
-    socket.on("room:leave", leaveRoom);
-    socket.on("disconnect", leaveRoom);
+    // ── Mất kết nối (reload / rớt mạng) → HẸN GIỜ xóa, cho cơ hội quay lại ────
+    socket.on("disconnect", () => {
+      if (!currentRoomId) return;
+      const room = rooms.get(currentRoomId);
+      const member = room?.members.get(socket.userId);
+      // Chỉ hẹn xóa nếu socket này VẪN là socket hiện tại của user.
+      // Nếu user đã reload và kết nối bằng socket mới, member.socketId đã khác
+      // → không hẹn xóa (tránh xóa nhầm người vừa quay lại).
+      if (member && member.socketId === socket.id) {
+        scheduleLeave(currentRoomId, socket.userId);
+      }
+    });
   });
 }
 

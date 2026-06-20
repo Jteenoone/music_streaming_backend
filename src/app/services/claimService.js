@@ -128,7 +128,7 @@ const getClaimsService = async ({ status, page = 1, limit = 20 }) => {
   const [claims, total] = await Promise.all([
     CopyrightClaim.find(filter)
       .populate("claimant", "username email")
-      .populate("song", "title artist isrc iswc")
+      .populate("song", "title artist isrc iswc copyright")
       .populate("resolvedBy", "username")
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -165,10 +165,22 @@ const resolveClaimService = async ({ claimId, adminId, action, adminNote }) => {
   claim.adminNote = adminNote || "";
   claim.resolvedBy = adminId;
   claim.resolvedAt = new Date();
-  await claim.save();
+  // validateModifiedOnly: chi validate field vua sua — tranh loi voi khieu nai cu
+  // thieu field bat buoc (goodFaith, claimantName, claimantEmail...)
+  await claim.save({ validateModifiedOnly: true });
 
   if (action === "approved") {
-    await Song.findByIdAndUpdate(claim.song._id, { "copyright.status": "disputed" });
+    // An bai hat: dat copyright.status = "disputed".
+    // Dung load + save co guard vi mot so bai hat cu co the luu copyright sai dinh dang
+    // (vd: chuoi thay vi object), khien findByIdAndUpdate("copyright.status") bi loi.
+    const song = await Song.findById(claim.song._id);
+    if (song) {
+      const raw = song.toObject().copyright;
+      const current = raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+      // Gan lai ca object (khong mutate tai cho) de tranh loi voi du lieu copyright sai dinh dang
+      song.copyright = { ...current, status: "disputed" };
+      await song.save({ validateModifiedOnly: true });
+    }
     await CopyrightClaim.updateMany(
       { song: claim.song._id, _id: { $ne: claimId }, status: "pending" },
       {

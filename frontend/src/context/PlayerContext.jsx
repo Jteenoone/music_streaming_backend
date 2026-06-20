@@ -4,6 +4,16 @@ import { useAuth } from './AuthContext';
 
 const PlayerContext = createContext();
 
+// Fisher-Yates: trả về mảng MỚI đã xáo trộn (không mutate mảng gốc)
+const shuffleArray = (arr) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+};
+
 export function PlayerProvider({children}) {
     const { user } = useAuth();
     const [queue, setQueue] = useState([]);
@@ -19,6 +29,8 @@ export function PlayerProvider({children}) {
     userRef.current = user;
 
     const queueRef = useRef(queue);
+    // Lưu thứ tự queue GỐC khi bật shuffle (null = đang không shuffle) để khôi phục khi tắt
+    const originalQueueRef = useRef(null);
     const currentIndexRef = useRef(currentIndex);
     const repeatModeRef = useRef(repeatMode);
     const isQueuedContextRef = useRef(isQueuedContext);
@@ -61,12 +73,32 @@ export function PlayerProvider({children}) {
             return;
         }
 
-        setIsQueuedContext(newQueue ? newQueue.length > 1 : false);
-        if (newQueue) setQueueSourceId(sourceId);
+        // Mở một queue mới (album/playlist/danh sách gợi ý)
+        if (newQueue) {
+            setQueueSourceId(sourceId);
+            setIsQueuedContext(newQueue.length > 1);
 
-        const finalIdx = idx === -1 ? 0 : idx;
-        const queueToSet = newQueue ?? (idx === -1 ? [song] : undefined);
-        loadAndPlay(song, queueToSet, finalIdx);
+            // Đang bật shuffle → xáo queue mới, giữ bài được chọn lên đầu
+            if (isShuffle && newQueue.length > 1) {
+                originalQueueRef.current = newQueue;                       // nhớ thứ tự gốc
+                const rest = shuffleArray(newQueue.filter(s => s.id !== song.id));
+                loadAndPlay(song, [song, ...rest], 0);
+            } else {
+                originalQueueRef.current = null;                          // context mới, chưa shuffle
+                loadAndPlay(song, newQueue, idx === -1 ? 0 : idx);
+            }
+            return;
+        }
+
+        // Không kèm queue: bài đã có trong queue thì phát tại đó
+        if (idx !== -1) {
+            loadAndPlay(song, undefined, idx);
+            return;
+        }
+
+        // Bài lẻ chưa có trong queue → tạo queue 1 bài
+        originalQueueRef.current = null;
+        loadAndPlay(song, [song], 0);
     };
 
     const handleNext = async () => {
@@ -97,6 +129,10 @@ export function PlayerProvider({children}) {
                 if(recommended.length > 0) {
                     const newQueue = [...q, ...recommended];
                     setQueue(newQueue);
+                    // Nếu đang shuffle, nối bài gợi ý vào cả thứ tự gốc để khôi phục đúng khi tắt
+                    if (originalQueueRef.current) {
+                        originalQueueRef.current = [...originalQueueRef.current, ...recommended];
+                    }
                     loadAndPlay(recommended[0], undefined, idx + 1);
                 } else {
                     setIsPlaying(false);
@@ -123,7 +159,34 @@ export function PlayerProvider({children}) {
         loadAndPlay(queue[prevIdx], undefined, prevIdx);
     };
 
-    const toggleShuffle = () => setIsShuffle(prev => !prev);
+    const toggleShuffle = () => {
+        const q = queueRef.current;
+        const idx = currentIndexRef.current;
+
+        if (!isShuffle) {
+            // BẬT shuffle: xáo queue hiện tại, giữ bài đang phát lên đầu
+            setIsShuffle(true);
+            if (q.length > 1 && idx !== null) {
+                originalQueueRef.current = q;                       // lưu thứ tự gốc
+                const current = q[idx];
+                const rest = shuffleArray(q.filter((_, i) => i !== idx));
+                setQueue([current, ...rest]);
+                setCurrentIndex(0);
+            }
+            return;
+        }
+
+        // TẮT shuffle: khôi phục thứ tự gốc, giữ nguyên bài đang phát
+        setIsShuffle(false);
+        const original = originalQueueRef.current;
+        originalQueueRef.current = null;
+        if (original && idx !== null) {
+            const current = q[idx];
+            const restoreIdx = current ? original.findIndex(s => s.id === current.id) : -1;
+            setQueue(original);
+            setCurrentIndex(restoreIdx === -1 ? 0 : restoreIdx);
+        }
+    };
     const toggleRepeat = () => setRepeatMode(prev =>
         prev === 'none' ? 'all' : prev === 'all' ? 'one' : 'none'
     );
